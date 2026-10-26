@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Ad-free internet speed test and network diagnostics.">
+  <meta name="color-scheme" content="dark">
+  <title>NetDiag — Internet Speed Test &amp; Diagnostics</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="NetDiag home"><span class="brand-mark">N</span> NetDiag</a>
+      <span class="badge">Ad-free · Privacy-focused</span>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="speed-heading">
+        <div class="eyebrow">NETWORK PERFORMANCE</div>
+        <h1 id="speed-heading">Internet Speed Test</h1>
+        <p class="lead">Measure your connection. Understand what is happening on your network.</p>
+
+        <div class="speed-display"><span id="live-speed">0.00</span><span class="unit">Mbps</span></div>
+        <div id="phase" class="phase" role="status" aria-live="polite">Ready to test</div>
+
+        <div class="controls">
+          <label for="streams">Test mode</label>
+          <select id="streams" aria-label="Concurrent data streams">
+            <option value="1">Single stream</option>
+            <option value="4" selected>4 streams</option>
+            <option value="8">8 streams</option>
+            <option value="16">16 streams</option>
+          </select>
+          <button id="start" class="primary">Start test</button>
+          <button id="stop" class="secondary" disabled>Stop</button>
+        </div>
+
+        <div class="results">
+          <div><span class="result-label">Latency</span><strong id="ping">—</strong><small>ms</small></div>
+          <div><span class="result-label">Jitter</span><strong id="jitter">—</strong><small>ms</small></div>
+          <div><span class="result-label">Download</span><strong id="download">—</strong><small>Mbps</small></div>
+          <div><span class="result-label">Upload</span><strong id="upload">—</strong><small>Mbps (estimate)</small></div>
+        </div>
+      </section>
+
+      <section class="section-heading">
+        <div><div class="eyebrow">AUTOMATIC CHECKS</div><h2>Network Diagnostics</h2></div>
+        <p>Lightweight checks run when this page opens. The bandwidth test runs only after you click Start.</p>
+      </section>
+
+      <div class="grid">
+        <section class="card" aria-labelledby="ip-heading">
+          <div class="card-head"><h3 id="ip-heading">IP information</h3><span id="ip-state" class="state">Checking</span></div>
+          <dl><div><dt>Observed IP</dt><dd id="public-ip">—</dd></div>
+            <div><dt>Address family</dt><dd id="ip-family">—</dd></div>
+            <div><dt>ASN</dt><dd id="asn">Not configured</dd></div></dl>
+          <p class="hint">Only the direct server peer is shown. Configure a trusted proxy policy before using a reverse proxy.</p>
+        </section>
+
+        <section class="card" aria-labelledby="tcp-heading">
+          <div class="card-head"><h3 id="tcp-heading">TCP diagnostics</h3><span id="tcp-state" class="state">Checking</span></div>
+          <dl><div><dt>Server TCP RTT</dt><dd id="tcp-rtt">—</dd></div>
+            <div><dt>Total retransmissions</dt><dd id="tcp-retrans">—</dd></div>
+            <div><dt>Send MSS</dt><dd id="tcp-mss">—</dd></div></dl>
+          <details><summary>Connection details</summary>
+            <dl><div><dt>Receive MSS</dt><dd id="tcp-receive-mss">—</dd></div>
+              <div><dt>Path MTU</dt><dd id="tcp-pmtu">—</dd></div>
+              <div><dt>RTT variance</dt><dd id="tcp-rttvar">—</dd></div></dl>
+          </details>
+          <p class="hint">Server-side TCP_INFO on Linux. Behind a TLS reverse proxy, these values describe the proxy-to-server connection.</p>
+        </section>
+
+        <section class="card" aria-labelledby="dns-heading">
+          <div class="card-head"><h3 id="dns-heading">DNS resolvers</h3><span class="state muted">Not configured</span></div>
+          <p class="empty">Resolver discovery requires a dedicated authoritative DNS observer and session correlation.</p>
+          <p class="hint">The browser cannot directly reveal the configured recursive DNS servers.</p>
+        </section>
+
+        <section class="card" aria-labelledby="udp-heading">
+          <div class="card-head"><h3 id="udp-heading">UDP / STUN</h3><span id="udp-state" class="state">Checking</span></div>
+          <dl><div><dt>STUN servers</dt><dd id="stun-count">0 / 10</dd></div>
+            <div><dt>UDP NAT type</dt><dd>Undetermined</dd></div>
+            <div><dt>Mapped endpoint</dt><dd id="udp-endpoint">—</dd></div></dl>
+          <details><summary>STUN server results</summary><ul id="stun-results" class="stun-list"></ul></details>
+          <p class="hint">Public STUN probes contact external providers. WebRTC may be disabled or restricted. STUN results cannot reliably classify cone/symmetric NAT.</p>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <p>NetDiag is an ad-free network measurement project. No analytics or tracking cookies are included in this scaffold.</p>
+      <p>Third-party STUN endpoints can observe your public IP. <a href="/privacy.html">Privacy information</a> · <a href="https://github.com/roseshot/NetDiag" rel="noopener noreferrer">Source code</a></p>
+    </footer>
+  </div>
+</body>
+</html>

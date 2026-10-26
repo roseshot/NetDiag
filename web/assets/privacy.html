@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Privacy Information — NetDiag</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="site-header"><a class="brand" href="/">← NetDiag</a></header>
+    <main class="legal">
+      <h1>Privacy Information</h1>
+      <p><strong>Draft for deployment review.</strong> This page documents the scaffold's technical behavior. It is not a complete GDPR privacy notice. The operator must add its identity, contact details, legal bases, retention periods, recipients, international transfer details, and users' rights before public deployment.</p>
+      <h2>Network measurements</h2>
+      <p>The application observes the client IP address of its HTTP peer to return IP information and run speed tests. Requests can appear in infrastructure logs according to operator configuration. The starter application does not include a database or user accounts.</p>
+      <h2>Third-party STUN probes</h2>
+      <p>On page load, browser-based WebRTC probes contact a list of public STUN servers operated by third parties. Those services can observe your network's public endpoint. Disable this feature in the source configuration before deployment if you cannot justify these requests or the providers' usage terms.</p>
+      <h2>Cookies and analytics</h2>
+      <p>This scaffold does not set tracking cookies or include advertising or analytics scripts. Adding any such technology requires a separate privacy and ePrivacy review.</p>
+    </main>
+  </div>
+</body>
+</html>

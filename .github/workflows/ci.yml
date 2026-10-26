@@ -1,0 +1,33 @@
+name: Go CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check formatting
+        run: |
+          output="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"
+          if [ -n "$output" ]; then
+            echo "$output"
+            exit 1
+          fi
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -race ./...
+      - name: Verify browser JavaScript
+        run: node --check web/assets/app.js
