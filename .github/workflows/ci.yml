@@ -34,4 +34,7 @@ jobs:
       - name: Test
         run: go test -race ./...
       - name: Verify browser JavaScript
-        run: node --check web/assets/app.js
+        run: |
+          node --check web/assets/app.js
+          node --check web/assets/metrics.js
+          node --test tests/*.test.cjs

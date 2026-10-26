@@ -7,9 +7,10 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 ## Included in this scaffold
 
 - Go standard-library HTTP server with embedded static assets.
-- HTTP latency and jitter samples (browser-side; not ICMP).
-- Single-stream and 4/8/16 concurrent-stream download and upload tests.
-- Live bandwidth display, cancellation, bounded transfer sizes, and basic server concurrency limits.
+- HTTP idle latency, jitter, and download/upload-loaded latency (P50, P95 and added RTT; not ICMP).
+- Single-stream and 4/8/16 concurrent-stream download and upload tests with a common timed measurement window.
+- Server-confirmed upload byte accounting for completed requests; aborted or incomplete uploads are excluded from final results.
+- Live bandwidth display, cancellation, bounded transfer sizes, a 64-transfer global limit and a 20-transfer per-peer limit.
 - Server-observed IP address and Linux TCP_INFO diagnostics.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
 - A homepage with transparent unconfigured states for ASN and DNS resolver discovery.
@@ -56,13 +57,13 @@ docker compose up --build
 ## Measurement and deployment limitations
 
 - **Concurrency means concurrent HTTP streams/requests**, not necessarily distinct TCP connections. HTTP/2 may multiplex them.
-- Upload speed uses browser-side XHR progress events and is an **estimate**, including potentially unacknowledged in-flight bytes.
-- Download speed is based on bytes read by the browser in a fixed window. These tests have not been calibrated against reference measurement tools.
+- Upload live speed uses browser-side XHR progress events, but **final upload results include only complete requests acknowledged by the Go server**. The result can understate throughput on slow or interrupted links because incomplete in-flight uploads are intentionally excluded.
+- Download speed uses bytes actually read by the browser and measured elapsed time. Loaded latency is HTTP RTT sampled while each transfer stage runs, compared with the idle RTT median. Sampling and throughput results have not been calibrated against reference measurement tools.
 - `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter, not a per-test retransmission delta.
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
 - ASN and DNS resolver discovery require separately licensed IP metadata and an authoritative DNS observer, respectively; they are **not implemented** in this scaffold.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.
-- The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
+- Automatic STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
 - Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.
 - This scaffold is not production hardened. Add per-IP quotas, trusted-proxy configuration, measurement-session accounting, monitoring, traffic budgets, real TLS termination, and legal review before a public launch.
 

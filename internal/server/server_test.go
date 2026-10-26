@@ -99,3 +99,38 @@ func TestPrivacyPolicyIsPublic(t *testing.T) {
 		}
 	}
 }
+
+func TestPerPeerTransferQuota(t *testing.T) {
+	a := &app{activePeers: make(map[string]int)}
+	const peer = "2001:db8::1"
+	for i := 0; i < maxPeerTransfers; i++ {
+		if !a.acquirePeer(peer) {
+			t.Fatalf("unexpected refusal at transfer %d", i)
+		}
+	}
+	if a.acquirePeer(peer) {
+		t.Fatal("per-peer quota was not enforced")
+	}
+	if !a.acquirePeer("192.0.2.1") {
+		t.Fatal("unrelated peer should remain eligible")
+	}
+	for i := 0; i < maxPeerTransfers; i++ {
+		a.releasePeer(peer)
+	}
+	a.releasePeer("192.0.2.1")
+	if len(a.activePeers) != 0 {
+		t.Fatal("peer state must be cleaned up after releases")
+	}
+}
+
+func TestPeerAddress(t *testing.T) {
+	for input, expected := range map[string]string{
+		"192.0.2.5:1234":       "192.0.2.5",
+		"[2001:db8::5]:1234":   "2001:db8::5",
+		"unparseable-address": "unparseable-address",
+	} {
+		if actual := peerAddress(input); actual != expected {
+			t.Errorf("peerAddress(%q) = %q, want %q", input, actual, expected)
+		}
+	}
+}

@@ -27,7 +27,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .primary{border:0;color:#061524;background:linear-gradient(135deg,#79ebd6,#80b9fc);min-width:145px}
 .secondary{border:1px solid #486180;color:#e2edff;background:#14233a}
 button:not(:disabled):hover{filter:brightness(1.09)}
-.results{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #2c3d54;padding-top:26px;gap:12px}
+.results{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #2c3d54;padding-top:26px;gap:12px}
 .results>div{display:flex;flex-direction:column;align-items:center;gap:1px}
 .result-label{font-size:13px;color:#9faec3}
 .results strong{font-size:26px;font-variant-numeric:tabular-nums}

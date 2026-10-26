@@ -7,6 +7,7 @@
   <meta name="color-scheme" content="dark">
   <title>NetDiag — Internet Speed Test &amp; Diagnostics</title>
   <link rel="stylesheet" href="/styles.css">
+  <script src="/metrics.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -41,8 +42,11 @@
           <div><span class="result-label">Latency</span><strong id="ping">—</strong><small>ms</small></div>
           <div><span class="result-label">Jitter</span><strong id="jitter">—</strong><small>ms</small></div>
           <div><span class="result-label">Download</span><strong id="download">—</strong><small>Mbps</small></div>
-          <div><span class="result-label">Upload</span><strong id="upload">—</strong><small>Mbps (estimate)</small></div>
+          <div><span class="result-label">Upload</span><strong id="upload">—</strong><small>Mbps · confirmed</small></div>
+          <div><span class="result-label">Download added latency</span><strong id="download-loaded">—</strong><small>ms · P50</small></div>
+          <div><span class="result-label">Upload added latency</span><strong id="upload-loaded">—</strong><small>ms · P50</small></div>
         </div>
+        <p class="hint">HTTP RTT under load · Download P95: <strong id="download-p95">—</strong> ms · Upload P95: <strong id="upload-p95">—</strong> ms. Upload excludes incomplete requests.</p>
       </section>
 
       <section class="section-heading">

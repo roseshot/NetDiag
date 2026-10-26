@@ -5,15 +5,17 @@ This document distinguishes delivered scaffold behavior from future work.
 ## Implemented in the scaffold
 
 - Go HTTP application and embedded responsive browser interface.
-- Basic HTTP RTT/jitter probes.
-- Single/multi-stream downloads and uploads (estimated upload metrics).
+- Idle HTTP RTT/jitter probes and load-time RTT measurements (P50, P95 and added latency).
+- Single/multi-stream downloads and uploads, with final upload bytes verified by server acknowledgement.
 - Linux server-side TCP_INFO and direct-peer IP display.
 - Configurable public WebRTC STUN probes with disabled-WebRTC fallback.
+- Per-peer request concurrency caps in addition to the global transfer limit.
+- Browser measurement math tests and Go HTTP tests.
 - Build/test workflow and Docker packaging.
 
 ## Planned, not yet implemented
 
-1. Calibrated test engine with request/session accounting, upload confirmation, adaptive parallelism and loaded-latency tests.
+1. Calibrated transfer window with warm-up, session accounting, in-flight upload byte reconciliation, adaptive parallelism and reference benchmark validation.
 2. Direct client-facing TCP diagnostic listener and proper per-test retransmission deltas.
 3. IPv4/IPv6 dual-stack endpoints with separately verified addresses.
 4. Licensed local IP-to-ASN lookup and BGP prefix data if licensed.

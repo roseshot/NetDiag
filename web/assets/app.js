@@ -18,6 +18,7 @@ const STUN_PROVIDERS = [
 // Review STUN provider terms and privacy implications before public deployment.
 const ENABLE_PUBLIC_STUN = true;
 let currentTest = null;
+const stunController = new AbortController();
 let testConfig = { durationSeconds: 8, downloadRequestBytes: 4194304, uploadRequestBytes: 4194304 };
 
 async function getJSON(path, options = {}) {
@@ -54,7 +55,7 @@ async function checkTCP() {
   }
 }
 
-function probeSTUN(url) {
+function probeSTUN(url, signal) {
   return new Promise((resolve) => {
     let pc;
     try {
@@ -70,10 +71,17 @@ function probeSTUN(url) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      signal.removeEventListener("abort", abortProbe);
       pc.close();
       resolve({ state, endpoint });
     };
     const timeout = setTimeout(() => finish(observedSrflx ? "reachable" : "timeout / inconclusive"), 3200);
+    const abortProbe = () => finish("paused");
+    signal.addEventListener("abort", abortProbe, { once: true });
+    if (signal.aborted) {
+      finish("paused");
+      return;
+    }
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
       const candidate = event.candidate;
@@ -126,12 +134,13 @@ async function checkSTUN() {
     });
     const mapped = results.find((r) => r && r.endpoint);
     if (mapped) set("udp-endpoint", mapped.endpoint);
-    set("udp-state", done === STUN_PROVIDERS.length ? "Completed" : "Checking " + done + "/10");
+    set("udp-state", stunController.signal.aborted ? "Paused for speed test" :
+      (done === STUN_PROVIDERS.length ? "Completed" : "Checking " + done + "/10"));
   };
   async function worker() {
-    while (next < STUN_PROVIDERS.length) {
+    while (!stunController.signal.aborted && next < STUN_PROVIDERS.length) {
       const index = next++;
-      results[index] = await probeSTUN(STUN_PROVIDERS[index][1]);
+      results[index] = await probeSTUN(STUN_PROVIDERS[index][1], stunController.signal);
       render();
     }
   }
@@ -142,20 +151,67 @@ function checkCancel(signal) {
   if (signal.aborted) throw new DOMException("Test cancelled", "AbortError");
 }
 
+let pingSequence = 0;
+
+async function pingSample(signal) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal.addEventListener("abort", abort, { once: true });
+  const timeout = setTimeout(() => controller.abort(), 2000);
+  const start = performance.now();
+  try {
+    const response = await fetch("/api/ping?sample=" + (++pingSequence), {
+      cache: "no-store",
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("HTTP latency probe failed");
+    return performance.now() - start;
+  } finally {
+    clearTimeout(timeout);
+    signal.removeEventListener("abort", abort);
+  }
+}
+
 async function measureLatency(signal) {
-  const times = [];
+  const samples = [];
   for (let i = 0; i < 12; i++) {
     checkCancel(signal);
-    const start = performance.now();
-    const response = await fetch("/api/ping?sample=" + i, { cache: "no-store", signal });
-    if (!response.ok) throw new Error("Ping probe failed");
-    const elapsed = performance.now() - start;
-    if (i > 1) times.push(elapsed); // Discard the first two samples.
+    const ms = await pingSample(signal);
+    if (i >= 2) samples.push(ms);
   }
-  const sorted = [...times].sort((a, b) => a - b);
-  const median = (sorted[4] + sorted[5]) / 2;
-  const jitter = times.slice(1).reduce((sum, value, i) => sum + Math.abs(value - times[i]), 0) / (times.length - 1);
-  return { median, jitter };
+  return NetDiagMetrics.summarizeLatency(samples);
+}
+
+function delayUntilNextProbe(signal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    const stop = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", stop);
+      resolve();
+    }, 250);
+    signal.addEventListener("abort", stop, { once: true });
+  });
+}
+
+async function measureLoadedLatency(signal, deadline) {
+  const samples = [];
+  while (!signal.aborted && performance.now() < deadline) {
+    try {
+      samples.push(await pingSample(signal));
+    } catch {
+      if (signal.aborted) break;
+      // A timeout is not a successful RTT sample.
+    }
+    await delayUntilNextProbe(signal);
+  }
+  return NetDiagMetrics.summarizeLatency(samples);
 }
 
 function makePayload(size) {
@@ -166,19 +222,21 @@ function makePayload(size) {
   return data;
 }
 
-function uploadOnce(payload, signal, addBytes) {
+// Only successful responses with an exact server byte acknowledgement
+// contribute to the final upload result. Progress is for the live UI only.
+function uploadOnce(payload, signal, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
     let last = 0;
-    const onAbort = () => xhr.abort();
-    signal.addEventListener("abort", onAbort, { once: true });
-    const cleanup = () => signal.removeEventListener("abort", onAbort);
+    const abort = () => xhr.abort();
+    const cleanup = () => signal.removeEventListener("abort", abort);
+    signal.addEventListener("abort", abort, { once: true });
     xhr.upload.onprogress = (event) => {
       const delta = Math.max(0, event.loaded - last);
       last = event.loaded;
-      addBytes(delta);
+      onProgress(delta);
     };
     xhr.onload = () => {
       cleanup();
@@ -186,8 +244,19 @@ function uploadOnce(payload, signal, addBytes) {
         reject(new Error("Upload returned HTTP " + xhr.status));
         return;
       }
-      addBytes(Math.max(0, payload.byteLength - last));
-      resolve();
+      let received;
+      try {
+        received = JSON.parse(xhr.responseText).receivedBytes;
+      } catch {
+        reject(new Error("Invalid upload confirmation"));
+        return;
+      }
+      if (received !== payload.byteLength) {
+        reject(new Error("Upload byte confirmation mismatch"));
+        return;
+      }
+      onProgress(Math.max(0, payload.byteLength - last));
+      resolve(received);
     };
     xhr.onerror = () => { cleanup(); reject(new Error("Upload connection failed")); };
     xhr.onabort = () => { cleanup(); reject(new DOMException("Upload cancelled", "AbortError")); };
@@ -196,79 +265,129 @@ function uploadOnce(payload, signal, addBytes) {
   });
 }
 
+// Each phase uses a common deadline. The upload result intentionally excludes
+// bytes from incomplete/aborted requests, so it can understate link capacity.
 async function timedTransfer(kind, streams, seconds, parentSignal) {
+  checkCancel(parentSignal);
   const controller = new AbortController();
-  const onAbort = () => controller.abort();
-  parentSignal.addEventListener("abort", onAbort, { once: true });
-  const end = performance.now() + seconds * 1000;
-  const timer = setTimeout(() => controller.abort(), seconds * 1000);
-  let bytes = 0;
-  let lastBytes = 0;
-  let errors = 0;
+  const cancel = () => controller.abort();
+  parentSignal.addEventListener("abort", cancel, { once: true });
+  const started = performance.now();
+  const deadline = started + seconds * 1000;
+  const timeout = setTimeout(() => controller.abort(), seconds * 1000);
+  let confirmedBytes = 0;
+  let progressBytes = 0;
+  let lastProgress = 0;
+  let lastTick = started;
+  let completedRequests = 0;
+  let fatalError = null;
   const interval = setInterval(() => {
-    const delta = bytes - lastBytes;
-    lastBytes = bytes;
-    set("live-speed", (delta * 8 / 250000).toFixed(2));
+    const now = performance.now();
+    const deltaMs = now - lastTick;
+    if (deltaMs > 0) {
+      set("live-speed", NetDiagMetrics.throughputMbps(progressBytes - lastProgress, deltaMs).toFixed(2));
+    }
+    lastProgress = progressBytes;
+    lastTick = now;
   }, 250);
   const payload = kind === "upload" ? makePayload(testConfig.uploadRequestBytes) : null;
+  const latencyTask = measureLoadedLatency(controller.signal, deadline);
+
   async function worker() {
-    while (performance.now() < end && !controller.signal.aborted) {
+    while (!controller.signal.aborted && performance.now() < deadline) {
       try {
         if (kind === "download") {
-          const response = await fetch("/api/download?bytes=" + testConfig.downloadRequestBytes,
-            { cache: "no-store", signal: controller.signal });
-          if (!response.ok || !response.body) throw new Error("Download failed");
+          const response = await fetch("/api/download?bytes=" + testConfig.downloadRequestBytes, {
+            cache: "no-store",
+            signal: controller.signal
+          });
+          if (!response.ok || !response.body) throw new Error("Download returned HTTP " + response.status);
           const reader = response.body.getReader();
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            bytes += value.byteLength;
+            confirmedBytes += value.byteLength;
+            progressBytes += value.byteLength;
           }
         } else {
-          await uploadOnce(payload, controller.signal, (delta) => { bytes += delta; });
+          confirmedBytes += await uploadOnce(payload, controller.signal, (delta) => {
+            progressBytes += delta;
+          });
         }
+        completedRequests++;
       } catch (error) {
-        if (controller.signal.aborted) return;
-        errors++;
-        if (errors >= 3) return;
+        if (controller.signal.aborted) break;
+        fatalError = error;
+        controller.abort();
+        break;
       }
     }
   }
+
+  let latency;
+  let elapsedMs;
   try {
     await Promise.all(Array.from({ length: streams }, () => worker()));
   } finally {
-    clearInterval(interval);
-    clearTimeout(timer);
-    parentSignal.removeEventListener("abort", onAbort);
+    elapsedMs = performance.now() - started;
     controller.abort();
+    latency = await latencyTask;
+    clearTimeout(timeout);
+    clearInterval(interval);
+    parentSignal.removeEventListener("abort", cancel);
   }
+
   checkCancel(parentSignal);
-  if (bytes === 0) throw new Error(kind + " transfer did not return any data");
-  return bytes * 8 / (seconds * 1000000);
+  if (fatalError) throw fatalError;
+  if (confirmedBytes <= 0 || (kind === "upload" && completedRequests === 0)) {
+    throw new Error(kind === "upload" ?
+      "No uploads completed within the measurement window" :
+      "Download did not return any data");
+  }
+  return {
+    mbps: NetDiagMetrics.throughputMbps(confirmedBytes, elapsedMs),
+    confirmedBytes,
+    elapsedMs,
+    completedRequests,
+    latency
+  };
+}
+
+function showLoadedLatency(kind, idle, loaded) {
+  const added = NetDiagMetrics.addedLatency(idle.medianMs, loaded.medianMs);
+  set(kind + "-loaded", fmt(added));
+  set(kind + "-p95", fmt(loaded.p95Ms));
 }
 
 async function startTest() {
   if (currentTest) return;
+  stunController.abort(); // Stop third-party probes before throughput or loaded-latency tests.
   const controller = new AbortController();
   currentTest = controller;
   $("start").disabled = true;
   $("stop").disabled = false;
-  set("ping", "—"); set("jitter", "—"); set("download", "—"); set("upload", "—");
+  for (const id of ["ping", "jitter", "download", "upload", "download-loaded",
+    "upload-loaded", "download-p95", "upload-p95"]) set(id, "—");
   set("live-speed", "0.00");
   const streams = Number($("streams").value);
   try {
     set("phase", "Measuring idle HTTP latency...");
-    const latency = await measureLatency(controller.signal);
-    set("ping", fmt(latency.median));
-    set("jitter", fmt(latency.jitter));
-    set("phase", "Measuring download with " + streams + " stream(s)...");
+    const idle = await measureLatency(controller.signal);
+    set("ping", fmt(idle.medianMs));
+    set("jitter", fmt(idle.jitterMs));
+
+    set("phase", "Measuring download and loaded latency with " + streams + " stream(s)...");
     const download = await timedTransfer("download", streams, testConfig.durationSeconds, controller.signal);
-    set("download", fmt(download));
-    set("phase", "Measuring upload with " + streams + " stream(s)...");
+    set("download", fmt(download.mbps));
+    showLoadedLatency("download", idle, download.latency);
+
+    set("phase", "Measuring upload and loaded latency with " + streams + " stream(s)...");
     const upload = await timedTransfer("upload", streams, testConfig.durationSeconds, controller.signal);
-    set("upload", fmt(upload));
-    set("phase", "Test completed");
-    set("live-speed", fmt(upload));
+    set("upload", fmt(upload.mbps));
+    showLoadedLatency("upload", idle, upload.latency);
+
+    set("phase", "Test completed · upload counts only server-confirmed requests");
+    set("live-speed", fmt(upload.mbps));
   } catch (error) {
     set("phase", error.name === "AbortError" ? "Test cancelled" : "Test failed: " + error.message);
     set("live-speed", "0.00");

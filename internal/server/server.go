@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/roseshot/NetDiag/internal/diagnostics"
@@ -17,8 +18,9 @@ import (
 
 const (
 	maxDownload = 16 << 20
-	maxUpload   = 16 << 20
-	defaultSize = 4 << 20
+	maxUpload        = 16 << 20
+	defaultSize      = 4 << 20
+	maxPeerTransfers = 20
 )
 
 type connectionKey struct{}
@@ -33,10 +35,39 @@ func ConnContext(ctx context.Context, conn net.Conn) context.Context {
 type app struct {
 	slots chan struct{}
 	block []byte
+	peerMu sync.Mutex
+	activePeers map[string]int
+}
+
+func peerAddress(remote string) string {
+	host, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		return remote
+	}
+	return host
+}
+
+func (a *app) acquirePeer(peer string) bool {
+	a.peerMu.Lock()
+	defer a.peerMu.Unlock()
+	if a.activePeers[peer] >= maxPeerTransfers {
+		return false
+	}
+	a.activePeers[peer]++
+	return true
+}
+
+func (a *app) releasePeer(peer string) {
+	a.peerMu.Lock()
+	defer a.peerMu.Unlock()
+	a.activePeers[peer]--
+	if a.activePeers[peer] <= 0 {
+		delete(a.activePeers, peer)
+	}
 }
 
 func New() http.Handler {
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10)}
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int)}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -96,6 +127,7 @@ func (a *app) config(w http.ResponseWriter, r *http.Request) {
 		"durationSeconds":      8,
 		"downloadRequestBytes": defaultSize,
 		"uploadRequestBytes":   defaultSize,
+		"maxPeerTransfers":     maxPeerTransfers,
 		"tcpDiagnostics":       "server_side",
 		"dnsResolvers":         "not_configured",
 		"udpNat":               "not_configured",
@@ -113,10 +145,7 @@ func (a *app) ip(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodGet) {
 		return
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
+	host := peerAddress(r.RemoteAddr)
 	parsed := net.ParseIP(host)
 	family := "unknown"
 	if parsed != nil {
@@ -161,6 +190,13 @@ func (a *app) transfer(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "server busy", http.StatusTooManyRequests)
 			return
 		}
+		peer := peerAddress(r.RemoteAddr)
+		if !a.acquirePeer(peer) {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "too many active transfers for this peer", http.StatusTooManyRequests)
+			return
+		}
+		defer a.releasePeer(peer)
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		next(w, r.WithContext(ctx))

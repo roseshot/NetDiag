@@ -25,12 +25,12 @@ The Compose configuration exposes an **HTTP development port**. Terminate HTTPS 
 
 ## Resource limits currently implemented
 
-- 64 concurrent transfer requests per Go process.
+- 64 concurrent transfer requests per Go process, with a 20-request cap per direct peer IP.
 - Download capped at 16 MiB per request.
 - Upload capped at 16 MiB per request.
 - Transfer handler context times out after 30 seconds.
 
-These are **not** substitutes for per-client quotas or global bandwidth budgets. Reverse proxies can change transfer behavior and measurements.
+Per-peer concurrency limits count the direct TCP peer; deployments behind a reverse proxy need an explicit trusted-client policy to prevent all visitors sharing one limit. These are **not** substitutes for per-client quotas or global bandwidth budgets. Reverse proxies can change transfer behavior and measurements.
 
 ## Important note on TCP diagnostics
 
