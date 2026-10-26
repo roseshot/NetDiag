@@ -89,16 +89,16 @@ func (a *app) config(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]any{
-		"name": "NetDiag",
-		"modes": []string{"single", "multi"},
-		"streamOptions": []int{1, 4, 8, 16},
-		"defaultStreams": 4,
-		"durationSeconds": 8,
+		"name":                 "NetDiag",
+		"modes":                []string{"single", "multi"},
+		"streamOptions":        []int{1, 4, 8, 16},
+		"defaultStreams":       4,
+		"durationSeconds":      8,
 		"downloadRequestBytes": defaultSize,
-		"uploadRequestBytes": defaultSize,
-		"tcpDiagnostics": "server_side",
-		"dnsResolvers": "not_configured",
-		"udpNat": "not_configured",
+		"uploadRequestBytes":   defaultSize,
+		"tcpDiagnostics":       "server_side",
+		"dnsResolvers":         "not_configured",
+		"udpNat":               "not_configured",
 	})
 }
 
@@ -127,11 +127,11 @@ func (a *app) ip(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respondJSON(w, map[string]any{
-		"ip": host,
-		"family": family,
-		"asn": nil,
+		"ip":        host,
+		"family":    family,
+		"asn":       nil,
 		"asnStatus": "not_configured",
-		"scope": "direct_peer",
+		"scope":     "direct_peer",
 	})
 }
 
