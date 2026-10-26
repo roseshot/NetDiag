@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	maxDownload = 16 << 20
+	maxDownload      = 16 << 20
 	maxUpload        = 16 << 20
 	defaultSize      = 4 << 20
 	maxPeerTransfers = 20
@@ -33,9 +33,9 @@ func ConnContext(ctx context.Context, conn net.Conn) context.Context {
 }
 
 type app struct {
-	slots chan struct{}
-	block []byte
-	peerMu sync.Mutex
+	slots       chan struct{}
+	block       []byte
+	peerMu      sync.Mutex
 	activePeers map[string]int
 }
 
