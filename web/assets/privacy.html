@@ -4,21 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Privacy Information — NetDiag</title>
+  <meta name="description" content="NetDiag Privacy Policy: how network diagnostics handle connection data and third-party STUN requests.">
+  <title>Privacy Policy — NetDiag</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="container">
     <header class="site-header"><a class="brand" href="/">← NetDiag</a></header>
     <main class="legal">
-      <h1>Privacy Information</h1>
-      <p><strong>Draft for deployment review.</strong> This page documents the scaffold's technical behavior. It is not a complete GDPR privacy notice. The operator must add its identity, contact details, legal bases, retention periods, recipients, international transfer details, and users' rights before public deployment.</p>
-      <h2>Network measurements</h2>
-      <p>The application observes the client IP address of its HTTP peer to return IP information and run speed tests. Requests can appear in infrastructure logs according to operator configuration. The starter application does not include a database or user accounts.</p>
-      <h2>Third-party STUN probes</h2>
-      <p>On page load, browser-based WebRTC probes contact a list of public STUN servers operated by third parties. Those services can observe your network's public endpoint. Disable this feature in the source configuration before deployment if you cannot justify these requests or the providers' usage terms.</p>
-      <h2>Cookies and analytics</h2>
-      <p>This scaffold does not set tracking cookies or include advertising or analytics scripts. Adding any such technology requires a separate privacy and ePrivacy review.</p>
+      <h1>Privacy Policy</h1>
+      <p><strong>Deployment notice:</strong> This policy describes the default behavior of the NetDiag software. Before operating a public service, the operator must identify itself, provide a contact method, and specify applicable legal bases, logging practices, retention periods, recipients, and user rights. This template is not a substitute for an operator-specific policy.</p>
+
+      <h2>Information processed</h2>
+      <p>NetDiag processes network connection information to display diagnostics and run requested speed tests. The web server can see the IP address of its directly connected peer, basic HTTP request information, and server-side TCP connection metrics. A reverse proxy may observe additional connection information under its own configuration.</p>
+      <p>Download tests transfer generated data to the browser. Upload tests send generated test data to the server, which reads and discards it without writing the payload to an application database. Measurement results are displayed in the browser.</p>
+
+      <h2>Automatic diagnostics and third parties</h2>
+      <p>When the homepage opens, the browser requests lightweight diagnostics. If WebRTC is available, it also attempts to contact configured public STUN servers run by third parties. Those providers may receive the browser's public network address and mapped UDP port and handle this information under their own policies. NetDiag does not send WebRTC candidates to its application server in the default configuration.</p>
+      <p>Browser settings or network restrictions can prevent STUN probes. The bandwidth test does not start until you select Start test.</p>
+
+      <h2>Cookies, advertising, and analytics</h2>
+      <p>The default application does not set cookies, use local storage for tracking, include advertising, or load analytics scripts. Operators who add these features must update this policy and implement any required controls.</p>
+
+      <h2>Storage and retention</h2>
+      <p>The starter application does not provide user accounts or a persistent measurement database. Infrastructure such as a web proxy, hosting platform, or firewall may keep access and security logs. Log contents and retention periods depend on the operator's deployment and must be disclosed by that operator.</p>
+
+      <h2>Contact and updates</h2>
+      <p>The service operator must publish a contact method for privacy inquiries and explain how this policy is updated before making the service publicly available.</p>
     </main>
   </div>
 </body>

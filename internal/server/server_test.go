@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -75,5 +76,26 @@ func TestMethodValidation(t *testing.T) {
 	New().ServeHTTP(res, req)
 	if res.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("got %d, want 405", res.Code)
+	}
+}
+
+func TestPrivacyPolicyIsPublic(t *testing.T) {
+	handler := New()
+	for _, tc := range []struct {
+		path     string
+		expected string
+	}{
+		{"/", `href="/privacy.html">Privacy Policy</a>`},
+		{"/privacy.html", "<h1>Privacy Policy</h1>"},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want 200", tc.path, res.Code)
+		}
+		if !strings.Contains(res.Body.String(), tc.expected) {
+			t.Errorf("%s: missing expected policy content", tc.path)
+		}
 	}
 }

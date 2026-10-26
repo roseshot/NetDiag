@@ -15,7 +15,7 @@ const STUN_PROVIDERS = [
   ["FreeSWITCH", "stun:stun.freeswitch.org:3478"],
   ["Sonetel", "stun:stun.sonetel.net:3478"],
 ];
-// Review provider terms and EU privacy requirements before commercial launch.
+// Review STUN provider terms and privacy implications before public deployment.
 const ENABLE_PUBLIC_STUN = true;
 let currentTest = null;
 let testConfig = { durationSeconds: 8, downloadRequestBytes: 4194304, uploadRequestBytes: 4194304 };

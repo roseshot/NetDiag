@@ -1,4 +1,4 @@
-# Deployment and EU privacy checklist
+# Deployment and privacy checklist
 
 ## Development
 
@@ -12,8 +12,8 @@ The Compose configuration exposes an **HTTP development port**. Terminate HTTPS 
 
 ## Before public commercial deployment
 
-1. Define the controller/operator identity and publish a complete Privacy Policy (contact details, purpose, legal basis, retention, processors, transfers, rights and complaint channel).
-2. Review ePrivacy rules in the target jurisdictions. No ad or tracking cookie is included, but WebRTC/STUN can expose network data to third parties.
+1. Publish an operator-specific Privacy Policy with contact details, purposes, applicable legal bases, data retention, third-party recipients, and rights information.
+2. Review privacy and communications rules that apply to the deployment. The scaffold uses no advertising or tracking cookies, but WebRTC/STUN can expose network data to third parties.
 3. Review acceptable-use and commercial terms for **every** public STUN server; remove unapproved endpoints. `ENABLE_PUBLIC_STUN` in `web/assets/app.js` can disable automatic third-party STUN checks.
 4. Choose and attribute an appropriately licensed local IP-to-ASN database before enabling ASN lookups.
 5. Set HTTP request quotas, per-IP and global concurrency limits, upstream bandwidth caps, quotas and cost alerts.

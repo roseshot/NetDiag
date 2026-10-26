@@ -81,7 +81,7 @@ compose.yaml              Local container development
 
 ## Privacy
 
-NetDiag intentionally has no advertising or analytics integration. However, HTTP connections expose an IP address to the server, and enabled STUN requests expose connection metadata to third parties. The included `/privacy.html` is a **technical draft**, not an operator-specific GDPR notice. Consult `docs/deployment.md` before EU deployment.
+NetDiag intentionally has no advertising or analytics integration. However, HTTP connections expose an IP address to the server, and enabled STUN requests expose connection metadata to third parties. The website includes a [Privacy Policy](web/assets/privacy.html) page (served at `/privacy.html`) describing the default software behavior. The operator must add deployment-specific contact, logging, retention, and other privacy disclosures before public launch. See `docs/deployment.md`.
 
 ## License
 
