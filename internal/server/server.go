@@ -217,4 +217,3 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, map[string]any{"receivedBytes": n})
 }
-
