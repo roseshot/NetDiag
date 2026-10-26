@@ -23,6 +23,7 @@ jobs:
           output="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"
           if [ -n "$output" ]; then
             echo "$output"
+            gofmt -d $(find . -name '*.go' -not -path './vendor/*')
             exit 1
           fi
       - name: Vet
