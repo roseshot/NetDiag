@@ -13,11 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          check-latest: true
+      - name: Show Go toolchain
+        run: go version
       - name: Check formatting
         run: |
           output="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"

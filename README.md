@@ -18,7 +18,9 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 
 ## Run locally
 
-Prerequisites: Go 1.23+.
+Prerequisites: Go 1.27 or newer. The project selects Go 1.27.3 as its current toolchain (the latest stable patch release as of October 27, 2026). Go's automatic toolchain selection may download that version if an older supported toolchain is installed.
+
+Go version policy: `go.mod` declares Go 1.27 as the minimum language/toolchain requirement, and its `toolchain` directive selects the current stable release used by CI and Docker. Update the selected toolchain and Docker image when a newer stable Go release is adopted.
 
 ```sh
 go run ./cmd/netdiag
