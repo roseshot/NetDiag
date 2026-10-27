@@ -5,8 +5,6 @@ import (
 	"log"
 	"runtime"
 	"strings"
-
-	"github.com/roseshot/NetDiag/internal/ipmeta"
 )
 
 // startupFeature describes what this process actually supports or has
