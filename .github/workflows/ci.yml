@@ -21,13 +21,8 @@ jobs:
           check-latest: true
       - name: Show Go toolchain
         run: go version
-      - name: Resolve module metadata
-        run: |
-          go mod tidy
-          echo '--- go.mod ---'
-          cat go.mod
-          echo '--- go.sum ---'
-          cat go.sum
+      - name: Verify Go dependency lockfile
+        run: go mod tidy -diff
       - name: Check formatting
         run: |
           output="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"
@@ -40,6 +35,8 @@ jobs:
         run: go vet ./...
       - name: Test
         run: go test -race ./...
+      - name: Build Docker image
+        run: docker build -t netdiag:ci .
       - name: Verify browser JavaScript
         run: |
           node --check web/assets/app.js

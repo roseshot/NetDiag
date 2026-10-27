@@ -11,28 +11,28 @@ import (
 
 const (
 	DatabaseType = "GeoLite2-ASN"
-	Source = "MaxMind GeoLite2 ASN"
-	checkEvery = time.Minute
+	Source       = "MaxMind GeoLite2 ASN"
+	checkEvery   = time.Minute
 )
 
 type Record struct {
-	Number uint `maxminddb:"autonomous_system_number"`
+	Number       uint   `maxminddb:"autonomous_system_number"`
 	Organization string `maxminddb:"autonomous_system_organization"`
 }
 
 type Result struct {
-	Status string
-	ASN uint
+	Status       string
+	ASN          uint
 	Organization string
-	Network string
+	Network      string
 	DatabaseTime string
 }
 
 type Store struct {
-	path string
-	mu sync.Mutex
-	reader *maxminddb.Reader
-	file os.FileInfo
+	path      string
+	mu        sync.Mutex
+	reader    *maxminddb.Reader
+	file      os.FileInfo
 	checkedAt time.Time
 	buildTime string
 }
@@ -46,7 +46,9 @@ func New(path string) *Store {
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.reader == nil { return nil }
+	if s.reader == nil {
+		return nil
+	}
 	err := s.reader.Close()
 	s.reader = nil
 	s.file = nil
@@ -56,7 +58,9 @@ func (s *Store) Close() error {
 // reloadLocked supports atomic MMDB replacement without restarting the server.
 // The updater must not modify or truncate a memory-mapped database in place.
 func (s *Store) reloadLocked() {
-	if time.Since(s.checkedAt) < checkEvery { return }
+	if time.Since(s.checkedAt) < checkEvery {
+		return
+	}
 	s.checkedAt = time.Now()
 	info, err := os.Stat(s.path)
 	if err != nil || info.IsDir() {
@@ -90,7 +94,9 @@ func (s *Store) reloadLocked() {
 	} else {
 		s.buildTime = ""
 	}
-	if old != nil { _ = old.Close() }
+	if old != nil {
+		_ = old.Close()
+	}
 }
 
 func (s *Store) dropLocked() {
@@ -104,6 +110,7 @@ func (s *Store) dropLocked() {
 
 // Lookup only uses a local MMDB; missing records never become invented ASNs.
 func (s *Store) Lookup(ip netip.Addr) Result {
+	ip = ip.Unmap()
 	if !ip.IsValid() || !ip.IsGlobalUnicast() || ip.IsPrivate() {
 		return Result{Status: "not_applicable"}
 	}
@@ -117,7 +124,6 @@ func (s *Store) Lookup(ip netip.Addr) Result {
 		return Result{Status: "unavailable"}
 	}
 
-	ip = ip.Unmap()
 	var record Record
 	result := s.reader.Lookup(ip)
 	if err := result.Decode(&record); err != nil {
@@ -131,10 +137,10 @@ func (s *Store) Lookup(ip netip.Addr) Result {
 		network = prefix.String()
 	}
 	return Result{
-		Status: "completed",
-		ASN: record.Number,
+		Status:       "completed",
+		ASN:          record.Number,
 		Organization: record.Organization,
-		Network: network,
+		Network:      network,
 		DatabaseTime: s.buildTime,
 	}
 }

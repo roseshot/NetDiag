@@ -102,17 +102,17 @@ func (a *app) address(w http.ResponseWriter, r *http.Request) {
 	}
 	if requested != actual {
 		probeResponse(w, http.StatusConflict, map[string]any{
-			"status": "unavailable",
-			"reason": "address_family_mismatch",
+			"status":         "unavailable",
+			"reason":         "address_family_mismatch",
 			"observedFamily": family,
-			"scope": "direct_peer",
+			"scope":          "direct_peer",
 		})
 		return
 	}
 	respondJSON(w, map[string]any{
 		"status": "completed",
-		"ip": ip.String(),
+		"ip":     ip.String(),
 		"family": family,
-		"scope": "direct_peer",
+		"scope":  "direct_peer",
 	})
 }

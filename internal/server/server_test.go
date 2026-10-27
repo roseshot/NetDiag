@@ -137,9 +137,9 @@ func TestPeerAddress(t *testing.T) {
 
 func TestASNLookupStatuses(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		path string
-		remote string
+		name     string
+		path     string
+		remote   string
 		expected string
 	}{
 		{name: "without_database", path: "", remote: "1.1.1.1:1234", expected: "not_configured"},
@@ -157,8 +157,8 @@ func TestASNLookupStatuses(t *testing.T) {
 				t.Fatalf("got HTTP %d", res.Code)
 			}
 			var reply struct {
-				IP string `json:"ip"`
-				ASN *uint `json:"asn"`
+				IP        string `json:"ip"`
+				ASN       *uint  `json:"asn"`
 				ASNStatus string `json:"asnStatus"`
 				ASNSource string `json:"asnSource"`
 			}
