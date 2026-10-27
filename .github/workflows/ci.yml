@@ -41,4 +41,5 @@ jobs:
         run: |
           node --check web/assets/app.js
           node --check web/assets/metrics.js
+          node --check web/assets/asn-ui.js
           node --test tests/*.test.cjs

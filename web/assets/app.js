@@ -32,25 +32,10 @@ async function checkIP() {
     const result = await getJSON("/api/ip");
     set("public-ip", result.ip);
     set("ip-family", result.family);
-    const asnLabel = {
-      not_configured: "Not configured",
-      unavailable: "Database unavailable",
-      not_found: "No ASN match",
-      not_applicable: "Not applicable"
-    };
-    set("asn", result.asnStatus === "completed" ? "AS" + result.asn :
-      (asnLabel[result.asnStatus] || "Unavailable"));
-    set("asn-organization", result.asnStatus === "completed" ?
-      (result.asnOrganization || "Unknown organization") : "—");
-    set("asn-network", result.asnStatus === "completed" ?
-      (result.asnNetwork || "—") : "—");
-    set("asn-domain", result.asnStatus === "completed" ?
-      (result.asnDomain || "—") : "—");
-    set("asn-source", result.asnSource ?
-      result.asnSource + (result.asnReloadStatus === "stale" ? " (stale)" : "") :
-      "Not configured");
+    NetDiagASN.render(result);
     set("ip-state", "Completed");
   } catch {
+    NetDiagASN.render(null);
     set("ip-state", "Unavailable");
   }
 }
@@ -480,3 +465,8 @@ getJSON("/api/config").then((config) => {
 void checkIP();
 void checkTCP();
 void checkSTUN();
+
+// Reflect MMDB hot reload on an already-open page without reloading it.
+setInterval(() => {
+  if (!document.hidden) void checkIP();
+}, 15000);

@@ -55,3 +55,11 @@ footer p{margin:5px 0}
 .legal p{color:#b3c5d9}
 .legal h2{margin-top:32px}
 @media(max-width:720px){.container{padding:18px 15px 40px}.site-header{margin-bottom:30px;gap:12px}.badge{font-size:10px}.hero{padding:40px 14px 28px;border-radius:20px}.results{grid-template-columns:repeat(2,1fr);gap:22px}.grid{grid-template-columns:1fr}.section-heading{display:block}.section-heading p{margin-top:8px}.card{padding:19px}.speed-display{letter-spacing:-2px}}
+
+/* Hide optional ASN content until a database returns a real match. */
+.asn-detail[hidden], #asn-note[hidden]{display:none}
+.asn-help{position:relative;display:inline-flex;vertical-align:middle;margin-left:4px}
+.asn-info-button{display:inline-grid;place-items:center;width:18px;height:18px;padding:0;border:1px solid #6485a5;border-radius:50%;background:#172c45;color:#bce4ff;font-size:11px;font-weight:700;line-height:1;cursor:help}
+.asn-info-button:focus-visible{outline:2px solid #8bd4ff;outline-offset:3px}
+.asn-info-tooltip{position:absolute;top:calc(100% + 8px);left:0;z-index:5;width:min(280px,75vw);padding:10px 12px;border:1px solid #426788;border-radius:9px;background:#0b1727;box-shadow:0 10px 25px #0008;color:#dce9fb;font-size:12px;font-weight:400;line-height:1.5;overflow-wrap:anywhere;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s ease}
+.asn-help:hover .asn-info-tooltip,.asn-help:focus-within .asn-info-tooltip{opacity:1;visibility:visible}

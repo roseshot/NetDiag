@@ -18,7 +18,7 @@ The reader **validates the database's MMDB metadata and integrity**. A name alon
 
 To select one database explicitly, set `NETDIAG_ASN_DB_PATH` to its full file path. The explicit file overrides discovery, and a missing or invalid override reports `unavailable` rather than silently selecting another provider.
 
-The selected database is logged during server startup. The `/api/ip` response and homepage also report the **actual provider** and MMDB database type when a database is active. No provider is claimed when none is available.
+The selected database is logged during server startup. The `/api/ip` response reports the **actual provider** and MMDB type. The homepage hides ASN details when the database is absent or the queried IP has no ASN match. When an ASN is available, an accessible info tooltip alongside it shows the provider, database type, build time (if supplied), and stale-snapshot status. The browser refreshes its IP/ASN display every 15 seconds while the page is visible, so a newly installed database can appear without refreshing the page.
 
 ## Background hot reload
 

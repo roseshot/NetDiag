@@ -8,6 +8,7 @@
   <title>NetDiag — Internet Speed Test &amp; Diagnostics</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/metrics.js" defer></script>
+  <script src="/asn-ui.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -59,12 +60,18 @@
           <div class="card-head"><h3 id="ip-heading">IP information</h3><span id="ip-state" class="state">Checking</span></div>
           <dl><div><dt>Observed IP</dt><dd id="public-ip">—</dd></div>
             <div><dt>Address family</dt><dd id="ip-family">—</dd></div>
-            <div><dt>ASN</dt><dd id="asn">Not configured</dd></div>
-            <div><dt>AS organization</dt><dd id="asn-organization">—</dd></div>
-            <div><dt>AS domain</dt><dd id="asn-domain">—</dd></div>
-            <div><dt>ASN data source</dt><dd id="asn-source">Not configured</dd></div>
-            <div><dt>ASN database range</dt><dd id="asn-network">—</dd></div></dl>
-          <p class="hint">IP and ASN describe the direct server peer. The ASN database range is not necessarily the announced BGP prefix. Behind a reverse proxy, the peer may be the proxy.</p>
+            <div class="asn-detail" hidden>
+              <dt>ASN <span class="asn-help">
+                <button class="asn-info-button" type="button" id="asn-info-button" aria-label="ASN data source" aria-describedby="asn-source-tooltip">i</button>
+                <span class="asn-info-tooltip" id="asn-source-tooltip" role="tooltip"></span>
+              </span></dt>
+              <dd id="asn">—</dd>
+            </div>
+            <div class="asn-detail" hidden><dt>AS organization</dt><dd id="asn-organization">—</dd></div>
+            <div class="asn-detail" hidden><dt>AS domain</dt><dd id="asn-domain">—</dd></div>
+            <div class="asn-detail" hidden><dt>ASN database range</dt><dd id="asn-network">—</dd></div></dl>
+          <p class="hint">The IP address describes the direct server peer, which may be a reverse proxy.</p>
+          <p id="asn-note" class="hint" hidden>The ASN database range is not necessarily an announced BGP prefix.</p>
         </section>
 
         <section class="card" aria-labelledby="families-heading">

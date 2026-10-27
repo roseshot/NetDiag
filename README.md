@@ -16,7 +16,7 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
-- A homepage with ASN, AS organization and matching MMDB network fields, and explicit unconfigured DNS resolver discovery.
+- A homepage that hides unavailable ASN metadata, offers an accessible source tooltip next to available ASNs, and shows explicit unconfigured DNS resolver discovery.
 - Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
