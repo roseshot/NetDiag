@@ -46,6 +46,10 @@ Each independent probe makes four small browser requests per family when configu
 
 The Compose example mounts `./data` read-only at `/var/lib/netdiag` and sets `NETDIAG_ASN_DB_DIR`. NetDiag automatically discovers supported IPinfo or MaxMind ASN MMDB filenames at startup. Download and update the files separately. Lookups remain local. While the server runs, a background watcher checks database files every 5 seconds by default and hot-swaps verified replacements without waiting for a request. Configure `NETDIAG_ASN_RELOAD_INTERVAL` (between `1s` and `1h`) to override that cadence. Never modify a memory-mapped MMDB in place; use atomic replacement. Invalid updates retain the last known good database and mark the reload status as stale. Use `NETDIAG_ASN_DB_PATH` only to override detection. Check licensing, freshness, file permissions and the operator's network retention policies. See `docs/asn.md`.
 
+## DNS resolver discovery
+
+The DNS observer is disabled by default. Enabling it requires an explicitly delegated zone, publicly reachable authoritative UDP/TCP DNS (port 53), and an HTTPS sink for unique challenge hostnames. See [DNS deployment details](dns.md) before enabling this opt-in feature. Recorded resolver addresses may belong to upstream forwarders and do not necessarily identify visitor device DNS settings.
+
 ## Resource limits currently implemented
 
 - 64 concurrent transfer requests per Go process, with a 20-request cap per direct peer IP.

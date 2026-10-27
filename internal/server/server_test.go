@@ -1,6 +1,10 @@
 package server
 
 import (
+	"net"
+	"net/url"
+
+	"github.com/roseshot/NetDiag/internal/dnsdiag"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -194,7 +198,8 @@ func TestASNBackgroundWatcherCleanup(t *testing.T) {
 	t.Setenv("NETDIAG_ASN_DB_PATH", "")
 	t.Setenv("NETDIAG_ASN_RELOAD_INTERVAL", "1s")
 	ctx, cancel := context.WithCancel(context.Background())
-	handler, cleanup := NewWithContext(ctx)
+	handler, cleanup, err := NewWithContext(ctx)
+	if err != nil { t.Fatal(err) }
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if res.Code != http.StatusOK {
@@ -228,6 +233,80 @@ func TestASNReloadInterval(t *testing.T) {
 		t.Setenv("NETDIAG_ASN_RELOAD_INTERVAL", tc.value)
 		if got := asnReloadInterval(); got != tc.expected {
 			t.Errorf("reload interval %q: got %s, want %s", tc.value, got, tc.expected)
+		}
+	}
+}
+
+func TestDNSProbeDisabledByDefault(t *testing.T) {
+	t.Setenv("NETDIAG_DNS_ZONE", "")
+	handler := New()
+	for _, path := range []string{"/api/dns/start", "/api/dns/result?token=foo"} {
+		method := http.MethodGet
+		if path == "/api/dns/start" { method = http.MethodPost }
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(method, path, nil))
+		if res.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s returned %d, want 503", path, res.Code)
+		}
+	}
+}
+
+func TestDNSProbeStartResultAndAccessControl(t *testing.T) {
+	t.Setenv("NETDIAG_ASN_DB_PATH", "")
+	t.Setenv("NETDIAG_ASN_DB_DIR", t.TempDir())
+	observer := dnsdiag.New(dnsdiag.Config{Zone: "dns.example.test.", Nameserver: "ns.example.test.", SinkIPv4: net.ParseIP("93.184.216.34")})
+	handler, _ := newHandler(observer)
+	req := httptest.NewRequest(http.MethodPost, "/api/dns/start", nil)
+	req.RemoteAddr = "198.51.100.1:1234"
+	req.Host = "netdiag.example.test"
+	req.Header.Set("Origin", "http://netdiag.example.test")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("start returned %d: %s", w.Code, w.Body.String())
+	}
+	var created struct {
+		Token string `json:"token"`
+		ProbeURL string `json:"probeURL"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil { t.Fatal(err) }
+	if len(created.Token) != 39 { t.Fatalf("invalid token: %q", created.Token) }
+	host, err := url.Parse(created.ProbeURL)
+	if err != nil { t.Fatal(err) }
+	observer.Observe(host.Hostname()+".", &net.UDPAddr{IP: net.ParseIP("8.8.4.4"), Port: 53})
+	check := func(peer string, want int) []byte {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodGet, "/api/dns/result?token="+created.Token, nil)
+		r.RemoteAddr = peer
+		out := httptest.NewRecorder()
+		handler.ServeHTTP(out, r)
+		if out.Code != want { t.Fatalf("result got %d, want %d: %s", out.Code, want, out.Body.String()) }
+		return out.Body.Bytes()
+	}
+	if got := check("203.0.113.2:2345", http.StatusNotFound); len(got) == 0 {
+		t.Fatal("unexpected empty unauthorized response")
+	}
+	data := check("198.51.100.1:4444", http.StatusOK)
+	if !strings.Contains(string(data), "8.8.4.4") || !strings.Contains(string(data), "authoritative_dns_peers") {
+		t.Fatalf("missing observed resolver: %s", data)
+	}
+	for _, invalid := range []struct {
+		origin string
+		fetchSite string
+	}{
+		{"https://evil.example", "same-origin"},
+		{"http://netdiag.example.test", "cross-site"},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/api/dns/start", nil)
+		req.RemoteAddr = "198.51.100.1:1111"
+		req.Host = "netdiag.example.test"
+		req.Header.Set("Origin", invalid.origin)
+		req.Header.Set("Sec-Fetch-Site", invalid.fetchSite)
+		out := httptest.NewRecorder()
+		handler.ServeHTTP(out, req)
+		if out.Code != http.StatusForbidden {
+			t.Errorf("untrusted DNS probe created a session: %d", out.Code)
 		}
 	}
 }

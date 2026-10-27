@@ -6,6 +6,7 @@
 - `internal/server`: exposes bounded, cache-disabled measurement endpoints, IP observation, independent IPv4/IPv6 probe endpoints with strict CORS and TCP diagnostic access.
 - `internal/diagnostics`: Linux-specific TCP_INFO reading; other platforms report unavailable.
 - `internal/ipmeta`: locally managed, startup-detected and background-hot-reloadable IPinfo or MaxMind ASN MMDB lookups with serialized reader switching.
+- `internal/dnsdiag`: optional authoritative DNS service with random, expiring sessions and bounded recursive DNS peer observations.
 - `web`: embeds the static browser client in the Go binary.
 - `web/assets/app.js`: runs lightweight homepage checks and starts bandwidth measurements only after user interaction.
 
@@ -14,7 +15,7 @@ The initial implementation intentionally does not include a database, cache serv
 ## Browser measurement flow
 
 1. On page load, the browser calls `/api/ip` and `/api/diag/tcp`, checks dedicated IPv4/IPv6 origins when configured, and independently probes the configured public STUN endpoints using WebRTC.
-2. ASN information comes from an automatically selected local IPinfo or GeoLite2 ASN MMDB, while DNS resolver discovery remains unconfigured.
+2. ASN information comes from an automatically selected local IPinfo or GeoLite2 ASN MMDB, while DNS resolver observation remains opt-in and disabled unless authoritative DNS is configured.
 3. After the user clicks **Start test**, the browser stops outstanding STUN probes and measures idle HTTP RTT (P50 and jitter).
 4. JavaScript downloads streamed non-compressible data using 1, 4, 8, or 16 concurrent workers, while a separate loop measures loaded HTTP RTT.
 5. JavaScript uploads pseudorandom test payloads via XHR with progress reporting, bounded parallelism, and final byte counts only from successful server responses.

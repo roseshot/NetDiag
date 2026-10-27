@@ -16,7 +16,7 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
-- A homepage that hides unavailable ASN metadata, offers an accessible source tooltip next to available ASNs, and shows explicit unconfigured DNS resolver discovery.
+- A homepage that hides unavailable ASN metadata, offers an accessible source tooltip next to available ASNs, and offers opt-in DNS resolver discovery when configured.
 - Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
@@ -62,6 +62,12 @@ At startup, NetDiag automatically detects supported **IPinfo ASN, IPinfo Lite an
 | GET | `/api/diag/tcp` | Server TCP_INFO on Linux, if an accepted TCP socket is accessible |
 | GET | `/api/diag/address?family=4` | Require an actual IPv4 peer (409 on family mismatch) |
 | GET | `/api/diag/address?family=6` | Require an actual IPv6 peer (409 on family mismatch) |
+| POST | `/api/dns/start` | Start an opt-in, short-lived DNS challenge |
+| GET | `/api/dns/result?token=...` | Read an authorized DNS challenge result |
+
+## DNS resolver discovery
+
+DNS observer operation is disabled by default. Delegate a dedicated authoritative DNS zone, configure DNS UDP/TCP listeners and a public IPv4 HTTPS probe sink before enabling it. Visitors must click **Check DNS** to start an observation. Sessions expire after two minutes; reported IPs belong to authoritative DNS peers and may be shared DNS forwarders rather than the device's configured servers. See [DNS deployment](docs/dns.md).
 
 ## Independent IPv4 / IPv6 probes
 
@@ -99,7 +105,7 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - Download speed uses bytes actually read by the browser and measured elapsed time. Loaded latency is HTTP RTT sampled while each transfer stage runs, compared with the idle RTT median. Sampling and throughput results have not been calibrated against reference measurement tools.
 - `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter, not a per-test retransmission delta.
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
-- ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery still requires an authoritative DNS observer and is **not implemented**.
+- ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery is implemented but requires separate authoritative DNS delegation, UDP/TCP 53 reachability, and a HTTPS sink.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.
 - Automatic STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
 - Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.

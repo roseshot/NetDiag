@@ -10,12 +10,15 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"sort"
+	"strings"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/roseshot/NetDiag/internal/diagnostics"
+	"github.com/roseshot/NetDiag/internal/dnsdiag"
 	"github.com/roseshot/NetDiag/internal/ipmeta"
 	"github.com/roseshot/NetDiag/web"
 )
@@ -43,6 +46,7 @@ type app struct {
 	activePeers map[string]int
 	probes      probeConfig
 	asn         *ipmeta.Store
+	dnsObserver *dnsdiag.Observer
 }
 
 func peerAddress(remote string) string {
@@ -73,15 +77,19 @@ func (a *app) releasePeer(peer string) {
 }
 
 func New() http.Handler {
-	handler, _ := newHandler()
+	handler, _ := newHandler(nil)
 	return handler
 }
 
 // NewWithContext starts a background ASN database watcher for the running
 // HTTP service. The returned cleanup function stops the watcher, waits for
 // it to exit, and closes the MMDB reader.
-func NewWithContext(ctx context.Context) (http.Handler, func()) {
-	handler, database := newHandler()
+func NewWithContext(ctx context.Context) (http.Handler, func(), error) {
+	cfg, err := dnsdiag.FromEnv()
+	if err != nil { return nil, nil, err }
+	observer, closeDNS, err := dnsdiag.Start(ctx, cfg)
+	if err != nil { return nil, nil, err }
+	handler, database := newHandler(observer)
 	watchCtx, cancel := context.WithCancel(ctx)
 	done := database.Watch(watchCtx, asnReloadInterval())
 	var once sync.Once
@@ -89,12 +97,13 @@ func NewWithContext(ctx context.Context) (http.Handler, func()) {
 		once.Do(func() {
 			cancel()
 			<-done
+			closeDNS()
 			if err := database.Close(); err != nil {
 				log.Printf("ASN database close: %v", err)
 			}
 		})
 	}
-	return handler, closeASN
+	return handler, closeASN, nil
 }
 
 func asnReloadInterval() time.Duration {
@@ -111,11 +120,11 @@ func asnReloadInterval() time.Duration {
 	return value
 }
 
-func newHandler() (http.Handler, *ipmeta.Store) {
+func newHandler(observer *dnsdiag.Observer) (http.Handler, *ipmeta.Store) {
 	asn := ipmeta.NewAuto(os.Getenv("NETDIAG_ASN_DB_PATH"), os.Getenv("NETDIAG_ASN_DB_DIR"))
 	selected := asn.Status()
 	log.Printf("ASN database: status=%s source=%q type=%q", selected.Status, selected.Source, selected.DatabaseType)
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn}
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn, dnsObserver: observer}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -126,19 +135,26 @@ func newHandler() (http.Handler, *ipmeta.Store) {
 	mux.HandleFunc("/api/ip", a.ip)
 	mux.HandleFunc("/api/diag/tcp", a.tcp)
 	mux.HandleFunc("/api/diag/address", a.address)
+	mux.HandleFunc("/api/dns/start", a.dnsStart)
+	mux.HandleFunc("/api/dns/result", a.dnsResult)
 	mux.HandleFunc("/api/download", a.transfer(a.download))
 	mux.HandleFunc("/api/upload", a.transfer(a.upload))
 	mux.Handle("/", http.FileServer(http.FS(web.Files())))
-	return securityHeaders(mux, a.probes), asn
+	return securityHeaders(mux, a.probes, observer), asn
 }
 
-func securityHeaders(next http.Handler, probes probeConfig) http.Handler {
+func securityHeaders(next http.Handler, probes probeConfig, observer *dnsdiag.Observer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cache-Control", "no-store, no-transform")
-		w.Header().Set("Content-Security-Policy", probes.csp())
+		policy := probes.csp()
+		if observer != nil {
+			zone := observer.Zone()
+			policy = strings.Replace(policy, "img-src 'self' data:", "img-src 'self' data: https://*."+zone, 1)
+		}
+		w.Header().Set("Content-Security-Policy", policy)
 		if r.URL.Path == "/api/diag/address" {
 			w.Header().Add("Vary", "Origin")
 			if origin := r.Header.Get("Origin"); probes.allows(origin) {
@@ -188,7 +204,7 @@ func (a *app) config(w http.ResponseWriter, r *http.Request) {
 			"ipv6": a.probes.ipv6Origin,
 		},
 		"tcpDiagnostics": "server_side",
-		"dnsResolvers":   "not_configured",
+		"dnsResolvers":   map[bool]string{true: "available", false: "not_configured"}[a.dnsObserver != nil],
 		"udpNat":         "not_configured",
 	})
 }
@@ -329,4 +345,84 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]any{"receivedBytes": n})
+}
+
+// dnsStart creates a short-lived DNS challenge. It only responds to explicit
+// same-origin POSTs. Disabled instances return 503 without allocating state.
+func (a *app) dnsStart(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) { return }
+	if a.dnsObserver == nil {
+		http.Error(w, "DNS discovery not configured", http.StatusServiceUnavailable)
+		return
+	}
+	// Browsers supply Fetch Metadata. Reject cross-site submissions and never
+	// enable cross-origin access to sessions.
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+		http.Error(w, "cross-site DNS sessions are not supported", http.StatusForbidden)
+		return
+	}
+	if origin := r.Header.Get("Origin"); origin != "" && !sameRequestOrigin(r, origin) {
+		http.Error(w, "invalid origin", http.StatusForbidden)
+		return
+	}
+	session, err := a.dnsObserver.StartSession(peerAddress(r.RemoteAddr))
+	if err != nil {
+		w.Header().Set("Retry-After", "10")
+		http.Error(w, "DNS probe capacity exceeded", http.StatusTooManyRequests)
+		return
+	}
+	respondJSON(w, map[string]any{
+		"token": session.ID,
+		"probeURL": "https://" + session.Host + "/pixel.gif",
+		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
+	})
+}
+
+func sameRequestOrigin(r *http.Request, origin string) bool {
+	scheme := "http"
+	if r.TLS != nil { scheme = "https" }
+	return origin == scheme + "://" + r.Host
+}
+
+func (a *app) dnsResult(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) { return }
+	if a.dnsObserver == nil {
+		http.Error(w, "DNS discovery not configured", http.StatusServiceUnavailable)
+		return
+	}
+	token := r.URL.Query().Get("token")
+	if len(token) != 39 {
+		http.Error(w, "DNS session not found", http.StatusNotFound)
+		return
+	}
+	session, found := a.dnsObserver.Lookup(token, peerAddress(r.RemoteAddr))
+	if !found {
+		http.Error(w, "DNS session not found", http.StatusNotFound)
+		return
+	}
+	type resolver struct {
+		IP string `json:"ip"`
+		ASN *uint `json:"asn,omitempty"`
+		Organization string `json:"organization,omitempty"`
+	}
+	entries := make([]resolver, 0, len(session.Resolvers))
+	for _, ip := range session.Resolvers {
+		entry := resolver{IP: ip}
+		if parsed, err := netip.ParseAddr(ip); err == nil {
+			info := a.asn.Lookup(parsed)
+			if info.Status == "completed" {
+				number := info.ASN
+				entry.ASN = &number
+				entry.Organization = info.Organization
+			}
+		}
+		entries = append(entries, entry)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].IP < entries[j].IP })
+	respondJSON(w, map[string]any{
+		"status": map[bool]string{true: "observed", false: "pending"}[len(entries) > 0],
+		"resolvers": entries,
+		"scope": "authoritative_dns_peers",
+		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
+	})
 }

@@ -101,9 +101,12 @@
         </section>
 
         <section class="card" aria-labelledby="dns-heading">
-          <div class="card-head"><h3 id="dns-heading">DNS resolvers</h3><span class="state muted">Not configured</span></div>
-          <p class="empty">Resolver discovery requires a dedicated authoritative DNS observer and session correlation.</p>
-          <p class="hint">The browser cannot directly reveal the configured recursive DNS servers.</p>
+          <div class="card-head"><h3 id="dns-heading">DNS resolver discovery</h3><span id="dns-state" class="state muted">Not configured</span></div>
+          <p class="empty">Find the recursive resolvers that contact NetDiag's authoritative DNS observer.</p>
+          <button id="dns-start" class="secondary" type="button" disabled>Check DNS</button>
+          <ul id="dns-results" class="dns-results" aria-live="polite"></ul>
+          <p id="dns-message" class="hint">Configure a dedicated DNS observation zone to enable this test.</p>
+          <p class="hint">Opt-in only. The observed servers may be DNS forwarders or shared resolvers, not necessarily the DNS servers configured on your device.</p>
         </section>
 
         <section class="card" aria-labelledby="udp-heading">

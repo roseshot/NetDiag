@@ -23,6 +23,9 @@
       <p>When the homepage opens, the browser requests lightweight diagnostics. If independent IPv4 and IPv6 probe origins are configured, the browser also requests those operator-provided endpoints to measure address-family connectivity and approximate HTTP response time. Each endpoint can observe the directly connected peer IP address. If WebRTC is available, it also attempts to contact configured public STUN servers run by third parties. Those providers may receive the browser's public network address and mapped UDP port and handle this information under their own policies. NetDiag does not send WebRTC candidates to its application server in the default configuration.</p>
       <p>Browser settings or network restrictions can prevent STUN probes. The bandwidth test does not start until you select Start test.</p>
 
+      <h2>Optional DNS resolver discovery</h2>
+      <p>If an authoritative DNS observer is configured, clicking Check DNS generates a short-lived, random subdomain and asks the browser to resolve it. The observer temporarily records the source IP addresses of recursive DNS servers or forwarders that ask about the subdomain. These IP addresses are not necessarily the DNS settings of your device. Results are accessible only with the random session token and from the same direct HTTP peer, and sessions expire after two minutes. The test is not started automatically.</p>
+
       <h2>Cookies, advertising, and analytics</h2>
       <p>The default application does not set cookies, use local storage for tracking, include advertising, or load analytics scripts. Operators who add these features must update this policy and implement any required controls.</p>
 

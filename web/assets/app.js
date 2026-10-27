@@ -453,6 +453,10 @@ async function probeAddressFamily(family, origin) {
 
 getJSON("/api/config").then((config) => {
   testConfig = { ...testConfig, ...config };
+  dnsEnabled = config.dnsResolvers === "available";
+  $("dns-start").disabled = !dnsEnabled;
+  set("dns-state", dnsEnabled ? "Ready" : "Not configured");
+  if (dnsEnabled) set("dns-message", "Click Check DNS to request an opt-in resolver observation.");
   const origins = config.probeOrigins || {};
   void Promise.all([
     probeAddressFamily("ipv4", origins.ipv4),
@@ -462,6 +466,68 @@ getJSON("/api/config").then((config) => {
   set("ipv4-state", "Configuration unavailable");
   set("ipv6-state", "Configuration unavailable");
 });
+let dnsRunning = false;
+const dnsProbeImage = { current: null };
+
+async function checkDNS() {
+  if (dnsRunning) return;
+  dnsRunning = true;
+  $("dns-start").disabled = true;
+  $("dns-results").replaceChildren();
+  set("dns-state", "Checking");
+  set("dns-message", "Requesting a unique DNS challenge...");
+  try {
+    const created = await getJSON("/api/dns/start", { method: "POST" });
+    if (typeof created.token !== "string" || !/^([a-z2-7]{39})$/.test(created.token) ||
+        typeof created.probeURL !== "string" || !created.probeURL.startsWith("https://")) {
+      throw new Error("Unexpected DNS challenge response");
+    }
+    const probe = new Image();
+    dnsProbeImage.current = probe;
+    probe.referrerPolicy = "no-referrer";
+    probe.src = created.probeURL;
+    set("dns-message", "Waiting for recursive DNS servers to contact the observer...");
+    let matched = [];
+    for (let i = 0; i < 10; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const result = await getJSON("/api/dns/result?token=" + encodeURIComponent(created.token));
+      if (Array.isArray(result.resolvers)) {
+        matched = result.resolvers;
+        if (matched.length) break;
+      }
+    }
+    if (!matched.length) {
+      set("dns-state", "Inconclusive");
+      set("dns-message", "No matching DNS query was observed. Network policies, DNS caching, or browser restrictions can prevent a result.");
+      return;
+    }
+    for (const resolver of matched) {
+      const item = document.createElement("li");
+      const ip = document.createElement("strong");
+      ip.textContent = String(resolver.ip || "Unknown resolver");
+      item.append(ip);
+      if (resolver.asn && resolver.organization) {
+        const meta = document.createElement("span");
+        meta.textContent = "AS" + resolver.asn + " · " + resolver.organization;
+        item.append(meta);
+      }
+      $("dns-results").append(item);
+    }
+    set("dns-state", "Observed");
+    set("dns-message", "Observed authoritative DNS peers. These addresses may belong to forwarders or shared recursive services.");
+  } catch (error) {
+    set("dns-state", "Unavailable");
+    set("dns-message", "DNS discovery failed: " + error.message);
+  } finally {
+    dnsProbeImage.current = null;
+    dnsRunning = false;
+    $("dns-start").disabled = !dnsEnabled;
+  }
+}
+
+let dnsEnabled = false;
+$("dns-start").addEventListener("click", () => { void checkDNS(); });
+
 void checkIP();
 void checkTCP();
 void checkSTUN();

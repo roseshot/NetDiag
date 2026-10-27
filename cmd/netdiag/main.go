@@ -28,7 +28,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	handler, closeASN := server.NewWithContext(ctx)
+	handler, closeASN, err := server.NewWithContext(ctx)
+	if err != nil {
+		log.Fatalf("start network diagnostic listeners: %v", err)
+	}
 	defer closeASN()
 
 	srv := &http.Server{

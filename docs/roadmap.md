@@ -11,6 +11,7 @@ This document distinguishes delivered scaffold behavior from future work.
 - Optional IPinfo or MaxMind ASN MMDB lookups with startup auto-detection, schema-aware parsing, integrity validation, background polling/hot reload, retention of the last verified snapshot on invalid updates, source attribution and safe unavailable states.
 - Configurable IPv4/IPv6 independent probe origins, address-family verification, limited cross-origin access and browser HTTP RTT checks.
 - Optional direct Go HTTPS listener using externally managed certificates.
+- Opt-in authoritative DNS observer, expiring one-time challenges, resolver peer IPs and local ASN enrichment.
 - Configurable public WebRTC STUN probes with disabled-WebRTC fallback.
 - Per-peer request concurrency caps in addition to the global transfer limit.
 - Browser measurement math tests and Go HTTP tests.
@@ -22,7 +23,7 @@ This document distinguishes delivered scaffold behavior from future work.
 2. Direct client-facing TCP diagnostic listener and proper per-test retransmission deltas.
 3. Production dual-stack deployments and cross-network browser validation of independent IPv4/IPv6 probe origins.
 4. Production ASN database freshness alerting and independent BGP prefix verification (GeoLite matching ranges are not announced BGP prefixes).
-5. Authoritative DNS resolver observer and precise TTL-bounded session correlation.
+5. Production DNS delegation and TLS sink validation, resolver-forwarding accuracy studies and browser interoperability testing.
 6. More granular WebRTC diagnostics, retaining `Undetermined` when NAT behavior cannot be established.
 7. Optional explicit-activation controls for third-party probes.
 8. Hardened rate limiting, observability and bounded traffic/cost policies.
