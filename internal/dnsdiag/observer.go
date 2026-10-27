@@ -20,17 +20,17 @@ import (
 )
 
 const (
-	sessionTTL = 2 * time.Minute
-	maxSessions = 4096
+	sessionTTL      = 2 * time.Minute
+	maxSessions     = 4096
 	maxPeerSessions = 3
-	maxResolvers = 8
+	maxResolvers    = 8
 )
 
 type Config struct {
-	Zone string
+	Zone       string
 	Nameserver string
-	Listen string
-	SinkIPv4 net.IP
+	Listen     string
+	SinkIPv4   net.IP
 }
 
 func FromEnv() (Config, error) {
@@ -69,24 +69,24 @@ func validHostname(raw string) bool {
 }
 
 type Session struct {
-	ID string
-	Host string
+	ID        string
+	Host      string
 	ExpiresAt time.Time
 	Resolvers []string
 }
 
 type entry struct {
-	id string
-	label string
-	owner string
-	expires time.Time
+	id        string
+	label     string
+	owner     string
+	expires   time.Time
 	resolvers map[string]struct{}
 }
 
 type Observer struct {
-	mu sync.Mutex
-	cfg Config
-	byID map[string]*entry
+	mu      sync.Mutex
+	cfg     Config
+	byID    map[string]*entry
 	byLabel map[string]*entry
 }
 
@@ -96,7 +96,9 @@ func New(c Config) *Observer {
 
 func randomLabel(bytes int) (string, error) {
 	raw := make([]byte, bytes)
-	if _, err := rand.Read(raw); err != nil { return "", err }
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
 	return strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(raw)), nil
 }
 
@@ -120,12 +122,22 @@ func (o *Observer) StartSession(peer string) (Session, error) {
 		return Session{}, errors.New("session_capacity_reached")
 	}
 	active := 0
-	for _, s := range o.byID { if s.owner == peer { active++ } }
-	if active >= maxPeerSessions { return Session{}, errors.New("peer_session_limit") }
+	for _, s := range o.byID {
+		if s.owner == peer {
+			active++
+		}
+	}
+	if active >= maxPeerSessions {
+		return Session{}, errors.New("peer_session_limit")
+	}
 	id, err := randomLabel(24)
-	if err != nil { return Session{}, err }
+	if err != nil {
+		return Session{}, err
+	}
 	label, err := randomLabel(16)
-	if err != nil { return Session{}, err }
+	if err != nil {
+		return Session{}, err
+	}
 	s := &entry{id: id, label: label, owner: peer, expires: now.Add(sessionTTL), resolvers: make(map[string]struct{})}
 	o.byID[id] = s
 	o.byLabel[label] = s
@@ -134,13 +146,21 @@ func (o *Observer) StartSession(peer string) (Session, error) {
 
 func (o *Observer) Observe(question string, remote net.Addr) {
 	ip, _, err := net.SplitHostPort(remote.String())
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	addr, err := netip.ParseAddr(ip)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	name := strings.ToLower(dns.Fqdn(question))
-	if !strings.HasSuffix(name, "."+o.cfg.Zone) { return }
+	if !strings.HasSuffix(name, "."+o.cfg.Zone) {
+		return
+	}
 	label := strings.TrimSuffix(name, "."+o.cfg.Zone)
-	if label == "" || strings.Contains(label, ".") { return }
+	if label == "" || strings.Contains(label, ".") {
+		return
+	}
 	now := time.Now()
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -156,9 +176,13 @@ func (o *Observer) Lookup(id, peer string) (Session, bool) {
 	defer o.mu.Unlock()
 	o.purgeLocked(time.Now())
 	s := o.byID[id]
-	if s == nil || s.owner != peer { return Session{}, false }
+	if s == nil || s.owner != peer {
+		return Session{}, false
+	}
 	result := Session{ID: s.id, ExpiresAt: s.expires}
-	for ip := range s.resolvers { result.Resolvers = append(result.Resolvers, ip) }
+	for ip := range s.resolvers {
+		result.Resolvers = append(result.Resolvers, ip)
+	}
 	// Consistent order makes snapshots and API tests deterministic.
 	sortStrings(result.Resolvers)
 	return result, true
@@ -201,7 +225,7 @@ func (o *Observer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			m.Answer = []dns.RR{&dns.SOA{Hdr: hdr, Ns: o.cfg.Nameserver, Mbox: "hostmaster." + o.cfg.Zone, Serial: 1, Refresh: 3600, Retry: 600, Expire: 86400, Minttl: 0}}
 		}
 	} else {
-		label := strings.TrimSuffix(name, "." + o.cfg.Zone)
+		label := strings.TrimSuffix(name, "."+o.cfg.Zone)
 		o.mu.Lock()
 		o.purgeLocked(time.Now())
 		_, known := o.byLabel[label]
@@ -223,9 +247,13 @@ func (o *Observer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 // Start binds UDP and TCP before returning and stops both listeners on cleanup.
 func Start(ctx context.Context, cfg Config) (*Observer, func(), error) {
-	if cfg.Zone == "" { return nil, func(){}, nil }
+	if cfg.Zone == "" {
+		return nil, func() {}, nil
+	}
 	udp, err := net.ListenPacket("udp", cfg.Listen)
-	if err != nil { return nil, nil, err }
+	if err != nil {
+		return nil, nil, err
+	}
 	tcp, err := net.Listen("tcp", cfg.Listen)
 	if err != nil {
 		_ = udp.Close()

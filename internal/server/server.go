@@ -10,10 +10,10 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"sort"
-	"strings"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,9 +86,13 @@ func New() http.Handler {
 // it to exit, and closes the MMDB reader.
 func NewWithContext(ctx context.Context) (http.Handler, func(), error) {
 	cfg, err := dnsdiag.FromEnv()
-	if err != nil { return nil, nil, err }
+	if err != nil {
+		return nil, nil, err
+	}
 	observer, closeDNS, err := dnsdiag.Start(ctx, cfg)
-	if err != nil { return nil, nil, err }
+	if err != nil {
+		return nil, nil, err
+	}
 	handler, database := newHandler(observer)
 	watchCtx, cancel := context.WithCancel(ctx)
 	done := database.Watch(watchCtx, asnReloadInterval())
@@ -350,7 +354,9 @@ func (a *app) upload(w http.ResponseWriter, r *http.Request) {
 // dnsStart creates a short-lived DNS challenge. It only responds to explicit
 // same-origin POSTs. Disabled instances return 503 without allocating state.
 func (a *app) dnsStart(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodPost) { return }
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
 	if a.dnsObserver == nil {
 		http.Error(w, "DNS discovery not configured", http.StatusServiceUnavailable)
 		return
@@ -372,20 +378,24 @@ func (a *app) dnsStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]any{
-		"token": session.ID,
-		"probeURL": "https://" + session.Host + "/pixel.gif",
+		"token":     session.ID,
+		"probeURL":  "https://" + session.Host + "/pixel.gif",
 		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
 	})
 }
 
 func sameRequestOrigin(r *http.Request, origin string) bool {
 	scheme := "http"
-	if r.TLS != nil { scheme = "https" }
-	return origin == scheme + "://" + r.Host
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return origin == scheme+"://"+r.Host
 }
 
 func (a *app) dnsResult(w http.ResponseWriter, r *http.Request) {
-	if !requireMethod(w, r, http.MethodGet) { return }
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
 	if a.dnsObserver == nil {
 		http.Error(w, "DNS discovery not configured", http.StatusServiceUnavailable)
 		return
@@ -401,8 +411,8 @@ func (a *app) dnsResult(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type resolver struct {
-		IP string `json:"ip"`
-		ASN *uint `json:"asn,omitempty"`
+		IP           string `json:"ip"`
+		ASN          *uint  `json:"asn,omitempty"`
 		Organization string `json:"organization,omitempty"`
 	}
 	entries := make([]resolver, 0, len(session.Resolvers))
@@ -420,9 +430,9 @@ func (a *app) dnsResult(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].IP < entries[j].IP })
 	respondJSON(w, map[string]any{
-		"status": map[bool]string{true: "observed", false: "pending"}[len(entries) > 0],
+		"status":    map[bool]string{true: "observed", false: "pending"}[len(entries) > 0],
 		"resolvers": entries,
-		"scope": "authoritative_dns_peers",
+		"scope":     "authoritative_dns_peers",
 		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
 	})
 }

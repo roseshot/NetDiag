@@ -4,10 +4,10 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/roseshot/NetDiag/internal/dnsdiag"
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/roseshot/NetDiag/internal/dnsdiag"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -199,7 +199,9 @@ func TestASNBackgroundWatcherCleanup(t *testing.T) {
 	t.Setenv("NETDIAG_ASN_RELOAD_INTERVAL", "1s")
 	ctx, cancel := context.WithCancel(context.Background())
 	handler, cleanup, err := NewWithContext(ctx)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/health", nil))
 	if res.Code != http.StatusOK {
@@ -242,7 +244,9 @@ func TestDNSProbeDisabledByDefault(t *testing.T) {
 	handler := New()
 	for _, path := range []string{"/api/dns/start", "/api/dns/result?token=foo"} {
 		method := http.MethodGet
-		if path == "/api/dns/start" { method = http.MethodPost }
+		if path == "/api/dns/start" {
+			method = http.MethodPost
+		}
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, httptest.NewRequest(method, path, nil))
 		if res.Code != http.StatusServiceUnavailable {
@@ -267,13 +271,19 @@ func TestDNSProbeStartResultAndAccessControl(t *testing.T) {
 		t.Fatalf("start returned %d: %s", w.Code, w.Body.String())
 	}
 	var created struct {
-		Token string `json:"token"`
+		Token    string `json:"token"`
 		ProbeURL string `json:"probeURL"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil { t.Fatal(err) }
-	if len(created.Token) != 39 { t.Fatalf("invalid token: %q", created.Token) }
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if len(created.Token) != 39 {
+		t.Fatalf("invalid token: %q", created.Token)
+	}
 	host, err := url.Parse(created.ProbeURL)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	observer.Observe(host.Hostname()+".", &net.UDPAddr{IP: net.ParseIP("8.8.4.4"), Port: 53})
 	check := func(peer string, want int) []byte {
 		t.Helper()
@@ -281,7 +291,9 @@ func TestDNSProbeStartResultAndAccessControl(t *testing.T) {
 		r.RemoteAddr = peer
 		out := httptest.NewRecorder()
 		handler.ServeHTTP(out, r)
-		if out.Code != want { t.Fatalf("result got %d, want %d: %s", out.Code, want, out.Body.String()) }
+		if out.Code != want {
+			t.Fatalf("result got %d, want %d: %s", out.Code, want, out.Body.String())
+		}
 		return out.Body.Bytes()
 	}
 	if got := check("203.0.113.2:2345", http.StatusNotFound); len(got) == 0 {
@@ -292,7 +304,7 @@ func TestDNSProbeStartResultAndAccessControl(t *testing.T) {
 		t.Fatalf("missing observed resolver: %s", data)
 	}
 	for _, invalid := range []struct {
-		origin string
+		origin    string
 		fetchSite string
 	}{
 		{"https://evil.example", "same-origin"},

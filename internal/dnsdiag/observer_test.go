@@ -16,14 +16,14 @@ type responseWriter struct {
 	remote net.Addr
 }
 
-func (w *responseWriter) LocalAddr() net.Addr { return &net.UDPAddr{} }
-func (w *responseWriter) RemoteAddr() net.Addr { return w.remote }
-func (w *responseWriter) WriteMsg(m *dns.Msg) error { w.answer = m; return nil }
+func (w *responseWriter) LocalAddr() net.Addr         { return &net.UDPAddr{} }
+func (w *responseWriter) RemoteAddr() net.Addr        { return w.remote }
+func (w *responseWriter) WriteMsg(m *dns.Msg) error   { w.answer = m; return nil }
 func (w *responseWriter) Write(p []byte) (int, error) { return len(p), nil }
-func (w *responseWriter) Close() error { return nil }
-func (w *responseWriter) TsigStatus() error { return nil }
-func (w *responseWriter) TsigTimersOnly(bool) {}
-func (w *responseWriter) Hijack() {}
+func (w *responseWriter) Close() error                { return nil }
+func (w *responseWriter) TsigStatus() error           { return nil }
+func (w *responseWriter) TsigTimersOnly(bool)         {}
+func (w *responseWriter) Hijack()                     {}
 
 func testConfig() Config {
 	return Config{Zone: "observer.example.test.", Nameserver: "ns1.example.test.", Listen: "127.0.0.1:0", SinkIPv4: net.ParseIP("93.184.216.34")}
@@ -56,7 +56,9 @@ func TestOptionalConfigurationAndValidation(t *testing.T) {
 func TestSessionIsolationAndExpiry(t *testing.T) {
 	o := New(testConfig())
 	s, err := o.StartSession("192.0.2.7")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(s.ID) != 39 || !strings.HasSuffix(s.Host, ".observer.example.test") {
 		t.Fatalf("unexpected session: %+v", s)
 	}
@@ -70,7 +72,9 @@ func TestSessionIsolationAndExpiry(t *testing.T) {
 		t.Fatalf("observation did not correlate uniquely: %+v", data)
 	}
 	for i := 0; i < maxPeerSessions-1; i++ {
-		if _, err := o.StartSession("192.0.2.7"); err != nil { t.Fatal(err) }
+		if _, err := o.StartSession("192.0.2.7"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if _, err := o.StartSession("192.0.2.7"); err == nil {
 		t.Fatal("missing peer session limit")
@@ -86,14 +90,18 @@ func TestSessionIsolationAndExpiry(t *testing.T) {
 func TestAuthoritativeResponsesAndNoOpenRecursion(t *testing.T) {
 	o := New(testConfig())
 	s, err := o.StartSession("192.0.2.7")
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	call := func(name string, qtype uint16) *dns.Msg {
 		t.Helper()
 		q := new(dns.Msg)
 		q.SetQuestion(dns.Fqdn(name), qtype)
 		w := &responseWriter{remote: &net.UDPAddr{IP: net.ParseIP("9.9.9.9"), Port: 5353}}
 		o.ServeDNS(w, q)
-		if w.answer == nil { t.Fatal("no DNS reply") }
+		if w.answer == nil {
+			t.Fatal("no DNS reply")
+		}
 		return w.answer
 	}
 	for _, qtype := range []uint16{dns.TypeA, dns.TypeAAAA} {
@@ -125,12 +133,18 @@ func TestDisabledListenerAndShutdown(t *testing.T) {
 	defer cancel()
 	if observer, cleanup, err := Start(ctx, Config{}); err != nil || observer != nil {
 		t.Fatalf("disabled DNS listener should be inert: %v, %+v", err, observer)
-	} else { cleanup() }
+	} else {
+		cleanup()
+	}
 	// A real UDP/TCP listener can bind to ephemeral ports; no privileged
 	// port or external authoritative zone is needed for this lifecycle test.
 	observer, cleanup, err := Start(ctx, testConfig())
-	if err != nil { t.Fatal(err) }
-	if observer == nil { t.Fatal("missing observer") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observer == nil {
+		t.Fatal("missing observer")
+	}
 	done := make(chan struct{})
 	go func() {
 		cleanup()
@@ -139,7 +153,7 @@ func TestDisabledListenerAndShutdown(t *testing.T) {
 	}()
 	select {
 	case <-done:
-	case <-time.After(2*time.Second):
+	case <-time.After(2 * time.Second):
 		t.Fatal("DNS listener shutdown hung")
 	}
 }
@@ -148,5 +162,7 @@ func TestNoCredentialsUsedByObserver(t *testing.T) {
 	if v := os.Getenv("NETDIAG_DNS_UNUSED_CREDENTIAL"); v != "" {
 		t.Skip("unexpected unrelated configuration")
 	}
-	if _, err := randomLabel(24); err != nil { t.Fatal(err) }
+	if _, err := randomLabel(24); err != nil {
+		t.Fatal(err)
+	}
 }
