@@ -1,14 +1,14 @@
 package server
 
 import (
-	"context"
-	"time"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCoreEndpoints(t *testing.T) {
@@ -216,7 +216,7 @@ func TestASNBackgroundWatcherCleanup(t *testing.T) {
 
 func TestASNReloadInterval(t *testing.T) {
 	for _, tc := range []struct {
-		value string
+		value    string
 		expected time.Duration
 	}{
 		{"", 5 * time.Second},

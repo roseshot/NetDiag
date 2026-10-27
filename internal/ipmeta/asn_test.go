@@ -2,11 +2,11 @@ package ipmeta
 
 import (
 	"context"
-	"time"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestUnavailableStates(t *testing.T) {
