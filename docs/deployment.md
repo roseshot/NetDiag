@@ -54,7 +54,7 @@ The Compose example mounts `./data` read-only at `/var/lib/netdiag` and sets `NE
 
 ## DNS resolver discovery
 
-The DNS observer is disabled by default. Enabling it requires an explicitly delegated zone, publicly reachable authoritative UDP/TCP DNS (port 53), and an HTTPS sink for unique challenge hostnames. See [DNS deployment details](dns.md) before enabling this opt-in feature. Recorded resolver addresses may belong to upstream forwarders and do not necessarily identify visitor device DNS settings.
+The DNS observer is disabled by default. Enabling it requires an explicitly delegated zone, publicly reachable authoritative UDP/TCP DNS (port 53), and wildcard TLS with observation challenge hostnames routed to NetDiag's built-in HTTPS pixel endpoint. See [DNS deployment details](dns.md) before enabling this opt-in feature. Recorded resolver addresses may belong to upstream forwarders and do not necessarily identify visitor device DNS settings.
 
 ## Resource limits currently implemented
 

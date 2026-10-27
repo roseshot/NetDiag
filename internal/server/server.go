@@ -159,6 +159,14 @@ func securityHeaders(next http.Handler, probes probeConfig, observer *dnsdiag.Ob
 			policy = strings.Replace(policy, "img-src 'self' data:", "img-src 'self' data: https://*."+zone, 1)
 		}
 		w.Header().Set("Content-Security-Policy", policy)
+		// Isolate the wildcard observation hostname from the main site.
+		// Only active DNS challenges can serve a fixed, cache-disabled pixel.
+		if observer != nil {
+			if inZone, active := observer.MatchHTTPSHost(requestHostname(r.Host)); inZone {
+				serveDNSHTTPSPixel(w, r, active)
+				return
+			}
+		}
 		if r.URL.Path == "/api/diag/address" {
 			w.Header().Add("Vary", "Origin")
 			if origin := r.Header.Get("Origin"); probes.allows(origin) {

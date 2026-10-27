@@ -90,7 +90,7 @@ At startup, NetDiag automatically detects supported **IPinfo ASN, IPinfo Lite an
 
 ## DNS resolver discovery
 
-DNS observer operation is disabled by default. Delegate a dedicated authoritative DNS zone, configure DNS UDP/TCP listeners and a public IPv4 HTTPS probe sink before enabling it. Visitors must click **Check DNS** to start an observation. Sessions expire after two minutes; reported IPs belong to authoritative DNS peers and may be shared DNS forwarders rather than the device's configured servers. See [DNS deployment](docs/dns.md).
+DNS observer operation is disabled by default. Delegate a dedicated authoritative DNS zone, configure DNS UDP/TCP listeners and route wildcard HTTPS challenge hostnames to NetDiag's built-in 1×1 GIF probe endpoint before enabling it. A valid wildcard TLS certificate is required; NetDiag does not provision one. Visitors must click **Check DNS** to start an observation. Sessions expire after two minutes; reported IPs belong to authoritative DNS peers and may be shared DNS forwarders rather than the device's configured servers. See [DNS deployment](docs/dns.md).
 
 ## Independent IPv4 / IPv6 probes
 
@@ -128,7 +128,7 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - Download speed uses bytes actually read by the browser and measured elapsed time. Loaded latency is HTTP RTT sampled while each transfer stage runs, compared with the idle RTT median. Sampling and throughput results have not been calibrated against reference measurement tools.
 - `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter, not a per-test retransmission delta.
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
-- ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery is implemented but requires separate authoritative DNS delegation, UDP/TCP 53 reachability, and a HTTPS sink.
+- ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery includes an authoritative DNS observer and an HTTPS pixel endpoint, but requires public DNS delegation, UDP/TCP 53 reachability, wildcard TLS configuration and hostname routing.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.
 - Automatic STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
 - Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.
