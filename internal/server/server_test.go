@@ -125,8 +125,8 @@ func TestPerPeerTransferQuota(t *testing.T) {
 
 func TestPeerAddress(t *testing.T) {
 	for input, expected := range map[string]string{
-		"192.0.2.5:1234":       "192.0.2.5",
-		"[2001:db8::5]:1234":   "2001:db8::5",
+		"192.0.2.5:1234":      "192.0.2.5",
+		"[2001:db8::5]:1234":  "2001:db8::5",
 		"unparseable-address": "unparseable-address",
 	} {
 		if actual := peerAddress(input); actual != expected {

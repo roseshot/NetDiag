@@ -140,9 +140,9 @@ func (a *app) config(w http.ResponseWriter, r *http.Request) {
 			"ipv4": a.probes.ipv4Origin,
 			"ipv6": a.probes.ipv6Origin,
 		},
-		"tcpDiagnostics":       "server_side",
-		"dnsResolvers":         "not_configured",
-		"udpNat":               "not_configured",
+		"tcpDiagnostics": "server_side",
+		"dnsResolvers":   "not_configured",
+		"udpNat":         "not_configured",
 	})
 }
 
