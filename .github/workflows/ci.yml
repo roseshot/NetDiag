@@ -21,6 +21,13 @@ jobs:
           check-latest: true
       - name: Show Go toolchain
         run: go version
+      - name: Resolve module metadata
+        run: |
+          go mod tidy
+          echo '--- go.mod ---'
+          cat go.mod
+          echo '--- go.sum ---'
+          cat go.sum
       - name: Check formatting
         run: |
           output="$(gofmt -l $(find . -name '*.go' -not -path './vendor/*'))"

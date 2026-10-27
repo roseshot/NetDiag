@@ -32,7 +32,18 @@ async function checkIP() {
     const result = await getJSON("/api/ip");
     set("public-ip", result.ip);
     set("ip-family", result.family);
-    set("asn", result.asn || "Not configured");
+    const asnLabel = {
+      not_configured: "Not configured",
+      unavailable: "Database unavailable",
+      not_found: "No ASN match",
+      not_applicable: "Not applicable"
+    };
+    set("asn", result.asnStatus === "completed" ? "AS" + result.asn :
+      (asnLabel[result.asnStatus] || "Unavailable"));
+    set("asn-organization", result.asnStatus === "completed" ?
+      (result.asnOrganization || "Unknown organization") : "—");
+    set("asn-network", result.asnStatus === "completed" ?
+      (result.asnNetwork || "—") : "—");
     set("ip-state", "Completed");
   } catch {
     set("ip-state", "Unavailable");

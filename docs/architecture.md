@@ -5,6 +5,7 @@
 - `cmd/netdiag`: starts the HTTP server and handles graceful shutdown.
 - `internal/server`: exposes bounded, cache-disabled measurement endpoints, IP observation, independent IPv4/IPv6 probe endpoints with strict CORS and TCP diagnostic access.
 - `internal/diagnostics`: Linux-specific TCP_INFO reading; other platforms report unavailable.
+- `internal/ipmeta`: locally managed, checked and reloadable MaxMind GeoLite2 ASN MMDB lookups.
 - `web`: embeds the static browser client in the Go binary.
 - `web/assets/app.js`: runs lightweight homepage checks and starts bandwidth measurements only after user interaction.
 
@@ -13,7 +14,7 @@ The initial implementation intentionally does not include a database, cache serv
 ## Browser measurement flow
 
 1. On page load, the browser calls `/api/ip` and `/api/diag/tcp`, checks dedicated IPv4/IPv6 origins when configured, and independently probes the configured public STUN endpoints using WebRTC.
-2. ASN and DNS resolver cards remain explicitly unconfigured.
+2. ASN information comes from an optional local GeoLite2 ASN database, while DNS resolver discovery remains unconfigured.
 3. After the user clicks **Start test**, the browser stops outstanding STUN probes and measures idle HTTP RTT (P50 and jitter).
 4. JavaScript downloads streamed non-compressible data using 1, 4, 8, or 16 concurrent workers, while a separate loop measures loaded HTTP RTT.
 5. JavaScript uploads pseudorandom test payloads via XHR with progress reporting, bounded parallelism, and final byte counts only from successful server responses.
@@ -31,7 +32,7 @@ The initial implementation intentionally does not include a database, cache serv
 
 ## Planned modules
 
-- `internal/ipmeta`: licensed local IP-to-ASN metadata lookup with source attribution.
+- `internal/ipmeta`: implemented MaxMind GeoLite2 ASN lookup; future work includes verified announced BGP prefixes and stale-data monitoring.
 - `internal/dnsdiag`: authoritative DNS challenge generation and resolver session correlation.
 - `internal/tcpdiag`: dedicated direct-to-client TCP probe listener with per-session retransmission deltas.
 - `internal/speedtest`: improved warm-up, automatic concurrency and calibrated measurement-window validation.

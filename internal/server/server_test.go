@@ -134,3 +134,54 @@ func TestPeerAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestASNLookupStatuses(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		path string
+		remote string
+		expected string
+	}{
+		{name: "without_database", path: "", remote: "1.1.1.1:1234", expected: "not_configured"},
+		{name: "missing_database", path: "/path/that/does/not/exist/GeoLite2-ASN.mmdb", remote: "1.1.1.1:1234", expected: "unavailable"},
+		{name: "private_ip", path: "", remote: "10.0.0.1:1234", expected: "not_applicable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("NETDIAG_ASN_DB_PATH", tc.path)
+			req := httptest.NewRequest(http.MethodGet, "/api/ip", nil)
+			req.RemoteAddr = tc.remote
+			req.Header.Set("X-Forwarded-For", "8.8.8.8")
+			res := httptest.NewRecorder()
+			New().ServeHTTP(res, req)
+			if res.Code != http.StatusOK {
+				t.Fatalf("got HTTP %d", res.Code)
+			}
+			var reply struct {
+				IP string `json:"ip"`
+				ASN *uint `json:"asn"`
+				ASNStatus string `json:"asnStatus"`
+				ASNSource string `json:"asnSource"`
+			}
+			if err := json.Unmarshal(res.Body.Bytes(), &reply); err != nil {
+				t.Fatal(err)
+			}
+			if reply.IP != peerAddress(tc.remote) || reply.ASNStatus != tc.expected || reply.ASN != nil {
+				t.Errorf("unexpected ASN lookup response: %+v", reply)
+			}
+			if reply.ASNSource != "MaxMind GeoLite2 ASN" {
+				t.Errorf("missing data source attribution: %q", reply.ASNSource)
+			}
+		})
+	}
+}
+
+func TestGeoLiteAttributionOnHomePage(t *testing.T) {
+	res := httptest.NewRecorder()
+	New().ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("homepage returned %d", res.Code)
+	}
+	if !strings.Contains(res.Body.String(), "This product includes GeoLite Data created by MaxMind") {
+		t.Fatal("homepage missing MaxMind attribution")
+	}
+}

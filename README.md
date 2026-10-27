@@ -11,12 +11,12 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Single-stream and 4/8/16 concurrent-stream download and upload tests with a common timed measurement window.
 - Server-confirmed upload byte accounting for completed requests; aborted or incomplete uploads are excluded from final results.
 - Live bandwidth display, cancellation, bounded transfer sizes, a 64-transfer global limit and a 20-transfer per-peer limit.
-- Server-observed IP address and Linux TCP_INFO diagnostics.
+- Server-observed IP address, local MaxMind GeoLite2 ASN lookups, and Linux TCP_INFO diagnostics.
 - Optional independent IPv4/IPv6 connectivity probes with separate observed addresses and HTTP RTT samples.
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
-- A homepage with transparent unconfigured states for ASN and DNS resolver discovery.
+- A homepage with ASN, AS organization and matching MMDB network fields, and explicit unconfigured DNS resolver discovery.
 - Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
@@ -45,6 +45,12 @@ Run with Docker:
 docker compose up --build
 ```
 
+## MaxMind GeoLite2 ASN
+
+ASN lookup uses the local **GeoLite2-ASN.mmdb** database. It does not query an external IP API. Download and update the licensed file separately, using MaxMind's official geoipupdate utility, and point NETDIAG_ASN_DB_PATH at the MMDB file. The database and credentials are not included in this repository. See [ASN setup and licensing](docs/asn.md).
+
+The site's footer includes MaxMind attribution. This product includes GeoLite Data created by MaxMind, available from https://www.maxmind.com.
+
 ## API
 
 | Method | Route | Purpose |
@@ -54,7 +60,7 @@ docker compose up --build
 | GET | `/api/ping` | HTTP 204 latency probe |
 | GET | `/api/download?bytes=4194304` | Uncompressed, streamed test bytes (max 16 MiB/request) |
 | POST | `/api/upload` | Receive and discard request body (max 16 MiB/request) |
-| GET | `/api/ip` | Direct peer IP and address family; ASN intentionally unconfigured |
+| GET | `/api/ip` | Direct peer IP, address family, and optional local GeoLite2 ASN metadata |
 | GET | `/api/diag/tcp` | Server TCP_INFO on Linux, if an accepted TCP socket is accessible |
 | GET | `/api/diag/address?family=4` | Require an actual IPv4 peer (409 on family mismatch) |
 | GET | `/api/diag/address?family=6` | Require an actual IPv6 peer (409 on family mismatch) |
@@ -95,7 +101,7 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - Download speed uses bytes actually read by the browser and measured elapsed time. Loaded latency is HTTP RTT sampled while each transfer stage runs, compared with the idle RTT median. Sampling and throughput results have not been calibrated against reference measurement tools.
 - `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter, not a per-test retransmission delta.
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
-- ASN and DNS resolver discovery require separately licensed IP metadata and an authoritative DNS observer, respectively; they are **not implemented** in this scaffold.
+- ASN lookup requires a separately obtained and updated MaxMind GeoLite2 ASN MMDB file. DNS resolver discovery still requires an authoritative DNS observer and is **not implemented**.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.
 - Automatic STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
 - Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.

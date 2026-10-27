@@ -59,8 +59,10 @@
           <div class="card-head"><h3 id="ip-heading">IP information</h3><span id="ip-state" class="state">Checking</span></div>
           <dl><div><dt>Observed IP</dt><dd id="public-ip">—</dd></div>
             <div><dt>Address family</dt><dd id="ip-family">—</dd></div>
-            <div><dt>ASN</dt><dd id="asn">Not configured</dd></div></dl>
-          <p class="hint">Only the direct server peer is shown. Configure a trusted proxy policy before using a reverse proxy.</p>
+            <div><dt>ASN</dt><dd id="asn">Not configured</dd></div>
+            <div><dt>AS organization</dt><dd id="asn-organization">—</dd></div>
+            <div><dt>ASN database range</dt><dd id="asn-network">—</dd></div></dl>
+          <p class="hint">IP and ASN describe the direct server peer. The ASN database range is not necessarily the announced BGP prefix. Behind a reverse proxy, the peer may be the proxy.</p>
         </section>
 
         <section class="card" aria-labelledby="families-heading">
@@ -108,6 +110,7 @@
 
     <footer>
       <p>NetDiag is an ad-free network measurement project. No analytics or tracking cookies are included in this scaffold.</p>
+      <p>This product includes GeoLite Data created by MaxMind, available from <a href="https://www.maxmind.com" rel="noopener noreferrer">MaxMind</a>.</p>
       <p>Third-party STUN endpoints can observe your public IP. <a href="/privacy.html">Privacy Policy</a> · <a href="https://github.com/roseshot/NetDiag" rel="noopener noreferrer">Source code</a></p>
     </footer>
   </div>

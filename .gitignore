@@ -31,3 +31,9 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local licensed IP intelligence databases and updater credentials
+*.mmdb
+data/
+GeoIP.conf
+geoipupdate.conf

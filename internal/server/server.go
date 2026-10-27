@@ -8,11 +8,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
+	"os"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/roseshot/NetDiag/internal/diagnostics"
+	"github.com/roseshot/NetDiag/internal/ipmeta"
 	"github.com/roseshot/NetDiag/web"
 )
 
@@ -38,6 +41,7 @@ type app struct {
 	peerMu      sync.Mutex
 	activePeers map[string]int
 	probes      probeConfig
+	asn         *ipmeta.Store
 }
 
 func peerAddress(remote string) string {
@@ -68,7 +72,7 @@ func (a *app) releasePeer(peer string) {
 }
 
 func New() http.Handler {
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig()}
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: ipmeta.New(os.Getenv("NETDIAG_ASN_DB_PATH"))}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -167,12 +171,27 @@ func (a *app) ip(w http.ResponseWriter, r *http.Request) {
 			family = "IPv6"
 		}
 	}
+	var addr netip.Addr
+	if parsed != nil {
+		if actual, ok := netip.AddrFromSlice(parsed); ok {
+			addr = actual.Unmap()
+		}
+	}
+	info := a.asn.Lookup(addr)
+	var number any
+	if info.Status == "completed" {
+		number = info.ASN
+	}
 	respondJSON(w, map[string]any{
-		"ip":        host,
-		"family":    family,
-		"asn":       nil,
-		"asnStatus": "not_configured",
-		"scope":     "direct_peer",
+		"ip":                 host,
+		"family":             family,
+		"asn":                number,
+		"asnStatus":          info.Status,
+		"asnOrganization":    info.Organization,
+		"asnNetwork":         info.Network,
+		"asnDatabaseBuiltAt": info.DatabaseTime,
+		"asnSource":          ipmeta.Source,
+		"scope":              "direct_peer",
 	})
 }
 

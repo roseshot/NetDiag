@@ -34,13 +34,17 @@ Each independent probe makes four small browser requests per family when configu
 1. Publish an operator-specific Privacy Policy with contact details, purposes, applicable legal bases, data retention, third-party recipients, and rights information.
 2. Review privacy and communications rules that apply to the deployment. The scaffold uses no advertising or tracking cookies, but WebRTC/STUN can expose network data to third parties.
 3. Review acceptable-use and commercial terms for **every** public STUN server; remove unapproved endpoints. `ENABLE_PUBLIC_STUN` in `web/assets/app.js` can disable automatic third-party STUN checks.
-4. Choose and attribute an appropriately licensed local IP-to-ASN database before enabling ASN lookups.
+4. Register for MaxMind GeoLite2 ASN, supply and update a local MMDB file, and display MaxMind attribution. Never commit the database or updater credentials. See `docs/asn.md`.
 5. Set HTTP request quotas, per-IP and global concurrency limits, upstream bandwidth caps, quotas and cost alerts.
 6. Deploy HTTPS. Set strict trusted-proxy rules to identify the real visitor's address; never blindly accept `X-Forwarded-For`.
 7. Do not report Go's TCP_INFO as browser-to-edge TCP_INFO when the edge proxies to Go. Use directly terminated Go TLS for diagnostic endpoints when direct-peer measurements are needed.
 8. Verify headers, privacy notices, logs and data retention policies; use no non-essential browser storage by default.
 9. Check IPv4-only, IPv6-only, dual-stack, blocked UDP, WebRTC disabled, proxy, VPN and mobile browser behavior.
 10. Compare speed results with reference tools under controlled conditions and test realistic network/resource limits.
+
+## ASN database deployment
+
+The Compose example mounts `./data` read-only at `/var/lib/netdiag`, using `GeoLite2-ASN.mmdb`. Prepare the `./data` directory and manage the MaxMind geoipupdate process separately. NetDiag performs no external MaxMind requests during page views and reloads valid database replacements when observed. Set `NETDIAG_ASN_DB_PATH` explicitly when running outside Compose. Check licensing, freshness, file permissions and the operator's network retention policies. See `docs/asn.md`.
 
 ## Resource limits currently implemented
 
