@@ -93,7 +93,9 @@ func NewWithContext(ctx context.Context) (http.Handler, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	handler, database := newHandler(observer)
+	handler, instance := newHandler(observer)
+	database := instance.asn
+	logStartupFeatures(instance)
 	watchCtx, cancel := context.WithCancel(ctx)
 	done := database.Watch(watchCtx, asnReloadInterval())
 	var once sync.Once
@@ -124,10 +126,8 @@ func asnReloadInterval() time.Duration {
 	return value
 }
 
-func newHandler(observer *dnsdiag.Observer) (http.Handler, *ipmeta.Store) {
+func newHandler(observer *dnsdiag.Observer) (http.Handler, *app) {
 	asn := ipmeta.NewAuto(os.Getenv("NETDIAG_ASN_DB_PATH"), os.Getenv("NETDIAG_ASN_DB_DIR"))
-	selected := asn.Status()
-	log.Printf("ASN database: status=%s source=%q type=%q", selected.Status, selected.Source, selected.DatabaseType)
 	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn, dnsObserver: observer}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
@@ -144,7 +144,7 @@ func newHandler(observer *dnsdiag.Observer) (http.Handler, *ipmeta.Store) {
 	mux.HandleFunc("/api/download", a.transfer(a.download))
 	mux.HandleFunc("/api/upload", a.transfer(a.upload))
 	mux.Handle("/", http.FileServer(http.FS(web.Files())))
-	return securityHeaders(mux, a.probes, observer), asn
+	return securityHeaders(mux, a.probes, observer), a
 }
 
 func securityHeaders(next http.Handler, probes probeConfig, observer *dnsdiag.Observer) http.Handler {

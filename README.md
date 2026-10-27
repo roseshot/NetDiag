@@ -20,6 +20,29 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
+## Startup feature summary
+
+When NetDiag starts, it logs a feature summary based on the **actual local configuration and loaded database**. Core functionality is labeled `enabled`; optional services are labeled `configured`, `not configured`, or `unavailable`, as applicable. Browser-only STUN probing is labeled `browser-dependent`, because Go cannot detect WebRTC support in visitors' browsers at startup.
+
+A minimal Linux instance with no MMDB or optional probe endpoints reports something like:
+
+```text
+NetDiag startup features:
+  [enabled          ] HTTP API and static UI: health, configuration and Privacy Policy
+  [enabled          ] Speed test: download/upload; 1, 4, 8 or 16 concurrent requests
+  [enabled          ] HTTP latency: idle RTT, jitter and loaded latency
+  [enabled          ] Public IP observation: direct HTTP peer (not trusted proxy headers)
+  [enabled          ] Address-family API: checks observed IPv4 or IPv6 direct peers
+  [enabled          ] TCP diagnostics: Linux TCP_INFO; server-side socket only
+  [not configured   ] ASN database: no local MMDB; ASN fields are hidden
+  [not configured   ] Independent IPv4 probe: dedicated origin not set
+  [not configured   ] Independent IPv6 probe: dedicated origin not set
+  [not configured   ] DNS resolver discovery: authoritative observer disabled
+  [browser-dependent] STUN/NAT discovery: WebRTC probes use third-party STUN servers; server cannot verify browser support
+```
+
+With an MMDB loaded, the summary includes the selected IPinfo/MaxMind provider and MMDB type. With a configured DNS observer, it displays the observation zone. Independent IPv4/IPv6 origins are reported as **configured, not confirmed reachable**; connectivity still depends on DNS, TLS, and routing. The HTTP/HTTPS listener is logged separately. ASN database updates are logged after startup by the existing hot-reload watcher.
+
 ## Run locally
 
 Prerequisites: Go 1.27 or newer. The project selects Go 1.27.3 as its current toolchain (the latest stable patch release as of October 27, 2026). Go's automatic toolchain selection may download that version if an older supported toolchain is installed.

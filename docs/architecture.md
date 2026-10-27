@@ -40,3 +40,7 @@ The initial implementation intentionally does not include a database, cache serv
 - `internal/monitoring`: rate controls, transfer budgets, structured metrics.
 
 Do not present unimplemented or inferred values as direct measurements.
+
+## Startup capability reporting
+
+`internal/server/startup.go` builds the operator-facing startup summary from the initialized HTTP handler, ASN database status, validated dedicated address-family probe origins, and active DNS observer. It distinguishes server-available features from optional but unconfigured capabilities and browser-dependent STUN functionality. The summary is informational: a configured external probe origin is not proof of public reachability. A separate listener message identifies HTTP versus direct HTTPS termination.

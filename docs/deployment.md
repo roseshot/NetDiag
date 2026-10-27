@@ -1,5 +1,11 @@
 # Deployment and privacy checklist
 
+## Startup configuration visibility
+
+On startup, NetDiag prints a feature summary to the application log. Check this before exposing a public service: the log distinguishes core measurement routes, Linux-only TCP_INFO, an actually loaded ASN database, configured IPv4/IPv6 probe origins, and an active DNS observer. Browser STUN tests are flagged as browser-dependent rather than presented as a server-side connection test. The HTTP or direct HTTPS listener mode is logged separately.
+
+The presence of a configured URL or authoritative DNS zone does **not** prove that external DNS delegation, TLS certificates or remote clients can reach it; validate these independently. A missing local MMDB does not stop startup, and the summary reports the ASN feature as not configured or unavailable instead of claiming data is present.
+
 ## Development
 
 ```sh

@@ -34,6 +34,12 @@ func main() {
 	}
 	defer closeASN()
 
+	transport := "HTTP"
+	if certFile != "" {
+		transport = "HTTPS (direct Go TLS termination)"
+	}
+	log.Printf("NetDiag listener configuration: transport=%s address=:%s", transport, port)
+
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           handler,
