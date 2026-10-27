@@ -174,7 +174,7 @@ func TestHTTPSChallengeHostLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := []struct {
-		host string
+		host   string
 		inZone bool
 		active bool
 	}{
