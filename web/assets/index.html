@@ -63,6 +63,19 @@
           <p class="hint">Only the direct server peer is shown. Configure a trusted proxy policy before using a reverse proxy.</p>
         </section>
 
+        <section class="card" aria-labelledby="families-heading">
+          <div class="card-head"><h3 id="families-heading">IPv4 / IPv6 connectivity</h3><span class="state muted">Independent probes</span></div>
+          <dl>
+            <div><dt>IPv4 address</dt><dd id="ipv4-address">—</dd></div>
+            <div><dt>IPv4 HTTP RTT</dt><dd id="ipv4-rtt">—</dd></div>
+            <div><dt>IPv4 status</dt><dd id="ipv4-state">Not configured</dd></div>
+            <div><dt>IPv6 address</dt><dd id="ipv6-address">—</dd></div>
+            <div><dt>IPv6 HTTP RTT</dt><dd id="ipv6-rtt">—</dd></div>
+            <div><dt>IPv6 status</dt><dd id="ipv6-state">Not configured</dd></div>
+          </dl>
+          <p class="hint">Independent checks require separately configured IPv4-only and IPv6-only endpoints. Values describe the direct server peer, not a forwarded address.</p>
+        </section>
+
         <section class="card" aria-labelledby="tcp-heading">
           <div class="card-head"><h3 id="tcp-heading">TCP diagnostics</h3><span id="tcp-state" class="state">Checking</span></div>
           <dl><div><dt>Server TCP RTT</dt><dd id="tcp-rtt">—</dd></div>

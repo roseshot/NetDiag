@@ -37,6 +37,7 @@ type app struct {
 	block       []byte
 	peerMu      sync.Mutex
 	activePeers map[string]int
+	probes      probeConfig
 }
 
 func peerAddress(remote string) string {
@@ -67,7 +68,7 @@ func (a *app) releasePeer(peer string) {
 }
 
 func New() http.Handler {
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int)}
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig()}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -77,19 +78,26 @@ func New() http.Handler {
 	mux.HandleFunc("/api/ping", a.ping)
 	mux.HandleFunc("/api/ip", a.ip)
 	mux.HandleFunc("/api/diag/tcp", a.tcp)
+	mux.HandleFunc("/api/diag/address", a.address)
 	mux.HandleFunc("/api/download", a.transfer(a.download))
 	mux.HandleFunc("/api/upload", a.transfer(a.upload))
 	mux.Handle("/", http.FileServer(http.FS(web.Files())))
-	return securityHeaders(mux)
+	return securityHeaders(mux, a.probes)
 }
 
-func securityHeaders(next http.Handler) http.Handler {
+func securityHeaders(next http.Handler, probes probeConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cache-Control", "no-store, no-transform")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", probes.csp())
+		if r.URL.Path == "/api/diag/address" {
+			w.Header().Add("Vary", "Origin")
+			if origin := r.Header.Get("Origin"); probes.allows(origin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -128,6 +136,10 @@ func (a *app) config(w http.ResponseWriter, r *http.Request) {
 		"downloadRequestBytes": defaultSize,
 		"uploadRequestBytes":   defaultSize,
 		"maxPeerTransfers":     maxPeerTransfers,
+		"probeOrigins": map[string]string{
+			"ipv4": a.probes.ipv4Origin,
+			"ipv6": a.probes.ipv6Origin,
+		},
 		"tcpDiagnostics":       "server_side",
 		"dnsResolvers":         "not_configured",
 		"udpNat":               "not_configured",

@@ -12,6 +12,9 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Server-confirmed upload byte accounting for completed requests; aborted or incomplete uploads are excluded from final results.
 - Live bandwidth display, cancellation, bounded transfer sizes, a 64-transfer global limit and a 20-transfer per-peer limit.
 - Server-observed IP address and Linux TCP_INFO diagnostics.
+- Optional independent IPv4/IPv6 connectivity probes with separate observed addresses and HTTP RTT samples.
+- Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
+- Optional direct TLS termination in Go for accurate direct-peer measurements.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
 - A homepage with transparent unconfigured states for ASN and DNS resolver discovery.
 - Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
@@ -53,6 +56,37 @@ docker compose up --build
 | POST | `/api/upload` | Receive and discard request body (max 16 MiB/request) |
 | GET | `/api/ip` | Direct peer IP and address family; ASN intentionally unconfigured |
 | GET | `/api/diag/tcp` | Server TCP_INFO on Linux, if an accepted TCP socket is accessible |
+| GET | `/api/diag/address?family=4` | Require an actual IPv4 peer (409 on family mismatch) |
+| GET | `/api/diag/address?family=6` | Require an actual IPv6 peer (409 on family mismatch) |
+
+## Independent IPv4 / IPv6 probes
+
+By default, the homepage shows both independent address-family checks as **Not configured**. It does not assume that an address observed on the main HTTP connection proves dual-stack support.
+
+For a public HTTPS deployment, configure the main site's environment:
+
+```sh
+NETDIAG_IPV4_ORIGIN=https://ipv4.example.test
+NETDIAG_IPV6_ORIGIN=https://ipv6.example.test
+```
+
+Run a NetDiag instance behind each probe hostname. Publish **A-only** DNS for the IPv4 hostname and **AAAA-only** DNS for the IPv6 hostname. Configure each probe server with the exact website origin permitted to read the JSON response:
+
+```sh
+NETDIAG_PROBE_ALLOWED_ORIGINS=https://netdiag.example.test
+```
+
+For direct TLS termination by Go (which preserves the actual peer address and makes Linux TCP_INFO relevant to the client-facing connection), supply both certificate files:
+
+```sh
+NETDIAG_TLS_CERT_FILE=/etc/netdiag/fullchain.pem
+NETDIAG_TLS_KEY_FILE=/etc/netdiag/privkey.pem
+PORT=443
+```
+
+The certificate must cover each public probe hostname. Mount certificates securely; never commit private keys. Plain HTTP origins are allowed only on loopback for development. The application validates configured origins and does not permit wildcard CORS.
+
+A reverse proxy that terminates the client connection **changes the meaning of the result**: the measured peer is the reverse proxy, not the browser. NetDiag deliberately ignores arbitrary `Forwarded` and `X-Forwarded-For` headers. See [deployment guidance](docs/deployment.md).
 
 ## Measurement and deployment limitations
 

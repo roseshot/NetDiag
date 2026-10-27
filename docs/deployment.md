@@ -8,7 +8,26 @@ go run ./cmd/netdiag
 docker compose up --build
 ```
 
-The Compose configuration exposes an **HTTP development port**. Terminate HTTPS on a trusted edge for public deployment.
+The Compose configuration exposes an **HTTP development port**. HTTPS can terminate at a trusted edge for ordinary web serving, or directly in Go for direct-peer network diagnostics.
+
+## Independent address-family diagnostics
+
+The homepage independently checks IPv4 and IPv6 **only when dedicated origins are configured**. Leave these variables unset to show "Not configured" and avoid misleading dual-stack claims.
+
+Configure the main website with:
+
+```sh
+NETDIAG_IPV4_ORIGIN=https://ipv4.example.test
+NETDIAG_IPV6_ORIGIN=https://ipv6.example.test
+```
+
+Use separate A-only and AAAA-only DNS records for the respective hostnames and ensure that the service is reachable on each protocol. These origins must belong to the operator; third-party probe URLs are not part of the default setup.
+
+On the probe instances set `NETDIAG_PROBE_ALLOWED_ORIGINS=https://netdiag.example.test` to allow only the exact website origin to read `/api/diag/address` across origins. This setting accepts a comma-separated list of explicit HTTPS origins when needed. Wildcards are not supported. Origins with paths, queries, credentials or fragments are rejected; loopback HTTP is accepted for development.
+
+For measurements that reflect the browser's real TCP/IP peer, let Go terminate TLS on the public diagnostic service by configuring `NETDIAG_TLS_CERT_FILE`, `NETDIAG_TLS_KEY_FILE`, and `PORT`. Both TLS file paths must be set together. Certificates are managed externally and mounted read-only into the container. Using a terminating reverse proxy causes this API to observe the **proxy-to-Go** connection instead, even if the proxy supplies forwarding headers. In that case, do not label the returned address as the visitor's public IP.
+
+Each independent probe makes four small browser requests per family when configured; the first warms the connection, and the following three provide an approximate median HTTP RTT. A mismatch, blocked request, unavailable origin or CORS failure is displayed as **Unavailable**; none of these individually proves the user's ISP lacks an address family.
 
 ## Before public commercial deployment
 
@@ -18,7 +37,7 @@ The Compose configuration exposes an **HTTP development port**. Terminate HTTPS 
 4. Choose and attribute an appropriately licensed local IP-to-ASN database before enabling ASN lookups.
 5. Set HTTP request quotas, per-IP and global concurrency limits, upstream bandwidth caps, quotas and cost alerts.
 6. Deploy HTTPS. Set strict trusted-proxy rules to identify the real visitor's address; never blindly accept `X-Forwarded-For`.
-7. Do not report Go's TCP_INFO as browser-to-edge TCP_INFO when the edge proxies to Go. Deploy a dedicated TCP termination endpoint if that is needed.
+7. Do not report Go's TCP_INFO as browser-to-edge TCP_INFO when the edge proxies to Go. Use directly terminated Go TLS for diagnostic endpoints when direct-peer measurements are needed.
 8. Verify headers, privacy notices, logs and data retention policies; use no non-essential browser storage by default.
 9. Check IPv4-only, IPv6-only, dual-stack, blocked UDP, WebRTC disabled, proxy, VPN and mobile browser behavior.
 10. Compare speed results with reference tools under controlled conditions and test realistic network/resource limits.

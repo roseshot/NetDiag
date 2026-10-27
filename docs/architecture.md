@@ -3,7 +3,7 @@
 ## Component boundaries
 
 - `cmd/netdiag`: starts the HTTP server and handles graceful shutdown.
-- `internal/server`: exposes bounded, cache-disabled measurement endpoints, IP observation, and TCP diagnostic access.
+- `internal/server`: exposes bounded, cache-disabled measurement endpoints, IP observation, independent IPv4/IPv6 probe endpoints with strict CORS and TCP diagnostic access.
 - `internal/diagnostics`: Linux-specific TCP_INFO reading; other platforms report unavailable.
 - `web`: embeds the static browser client in the Go binary.
 - `web/assets/app.js`: runs lightweight homepage checks and starts bandwidth measurements only after user interaction.
@@ -12,7 +12,7 @@ The initial implementation intentionally does not include a database, cache serv
 
 ## Browser measurement flow
 
-1. On page load, the browser calls `/api/ip` and `/api/diag/tcp`, and independently probes the configured public STUN endpoints using WebRTC.
+1. On page load, the browser calls `/api/ip` and `/api/diag/tcp`, checks dedicated IPv4/IPv6 origins when configured, and independently probes the configured public STUN endpoints using WebRTC.
 2. ASN and DNS resolver cards remain explicitly unconfigured.
 3. After the user clicks **Start test**, the browser stops outstanding STUN probes and measures idle HTTP RTT (P50 and jitter).
 4. JavaScript downloads streamed non-compressible data using 1, 4, 8, or 16 concurrent workers, while a separate loop measures loaded HTTP RTT.
@@ -21,7 +21,8 @@ The initial implementation intentionally does not include a database, cache serv
 
 ## Data integrity cautions
 
-- The server's TCP_INFO scope changes when a reverse proxy terminates TCP.
+- The server's TCP_INFO scope changes when a reverse proxy terminates TCP. Direct Go HTTPS termination is supported through certificate file environment variables.
+- IPv4/IPv6 probe endpoints validate the direct socket family and ignore forwarding headers. DNS and TLS routing must force the expected address family; a public terminating proxy prevents reliable peer observation.
 - A stream is not a TCP connection when multiplexing is enabled.
 - Browser-side upload progress is only used for the live display; final upload speed uses confirmed complete request payloads and can underestimate partially completed work.
 - STUN server-reflexive candidates alone cannot determine a full NAT behavior class.

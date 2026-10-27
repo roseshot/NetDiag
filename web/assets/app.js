@@ -401,7 +401,66 @@ async function startTest() {
 $("start").addEventListener("click", startTest);
 $("stop").addEventListener("click", () => currentTest?.abort());
 
-getJSON("/api/config").then((config) => { testConfig = { ...testConfig, ...config }; }).catch(() => {});
+// An independent operator-provided endpoint is required for each address family.
+// The Go endpoint returns HTTP 409 if the request arrives on the wrong family.
+async function probeAddressFamily(family, origin) {
+  if (!origin) {
+    set(family + "-state", "Not configured");
+    return;
+  }
+  const requested = family === "ipv4" ? "4" : "6";
+  const expected = family === "ipv4" ? "IPv4" : "IPv6";
+  const samples = [];
+  try {
+    for (let i = 0; i < 4; i++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      const started = performance.now();
+      let result;
+      try {
+        const response = await fetch(origin + "/api/diag/address?family=" +
+          requested + "&sample=" + i, {
+          mode: "cors",
+          credentials: "omit",
+          cache: "no-store",
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error("probe returned HTTP " + response.status);
+        result = await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (result.status !== "completed" || result.family !== expected ||
+          result.scope !== "direct_peer" || !result.ip) {
+        throw new Error("unexpected address-family response");
+      }
+      if (i === 0) {
+        set(family + "-address", result.ip);
+      } else {
+        samples.push(performance.now() - started);
+      }
+    }
+    const summary = NetDiagMetrics.summarizeLatency(samples);
+    set(family + "-rtt", fmt(summary.medianMs) + " ms");
+    set(family + "-state", "Available");
+  } catch {
+    set(family + "-address", "—");
+    set(family + "-rtt", "—");
+    set(family + "-state", "Unavailable");
+  }
+}
+
+getJSON("/api/config").then((config) => {
+  testConfig = { ...testConfig, ...config };
+  const origins = config.probeOrigins || {};
+  void Promise.all([
+    probeAddressFamily("ipv4", origins.ipv4),
+    probeAddressFamily("ipv6", origins.ipv6)
+  ]);
+}).catch(() => {
+  set("ipv4-state", "Configuration unavailable");
+  set("ipv6-state", "Configuration unavailable");
+});
 void checkIP();
 void checkTCP();
 void checkSTUN();

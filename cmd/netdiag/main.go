@@ -19,6 +19,12 @@ func main() {
 		port = "8080"
 	}
 
+	certFile := os.Getenv("NETDIAG_TLS_CERT_FILE")
+	keyFile := os.Getenv("NETDIAG_TLS_KEY_FILE")
+	if (certFile == "") != (keyFile == "") {
+		log.Fatal("NETDIAG_TLS_CERT_FILE and NETDIAG_TLS_KEY_FILE must be configured together")
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           server.New(),
@@ -32,7 +38,12 @@ func main() {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Printf("NetDiag listening on :%s", port)
+		if certFile != "" {
+			log.Printf("NetDiag HTTPS listening on :%s", port)
+			errCh <- srv.ListenAndServeTLS(certFile, keyFile)
+			return
+		}
+		log.Printf("NetDiag HTTP listening on :%s", port)
 		errCh <- srv.ListenAndServe()
 	}()
 

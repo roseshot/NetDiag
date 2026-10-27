@@ -20,7 +20,7 @@
       <p>Download tests transfer generated data to the browser. Upload tests send generated test data to the server, which reads and discards it without writing the payload to an application database. Measurement results are displayed in the browser.</p>
 
       <h2>Automatic diagnostics and third parties</h2>
-      <p>When the homepage opens, the browser requests lightweight diagnostics. If WebRTC is available, it also attempts to contact configured public STUN servers run by third parties. Those providers may receive the browser's public network address and mapped UDP port and handle this information under their own policies. NetDiag does not send WebRTC candidates to its application server in the default configuration.</p>
+      <p>When the homepage opens, the browser requests lightweight diagnostics. If independent IPv4 and IPv6 probe origins are configured, the browser also requests those operator-provided endpoints to measure address-family connectivity and approximate HTTP response time. Each endpoint can observe the directly connected peer IP address. If WebRTC is available, it also attempts to contact configured public STUN servers run by third parties. Those providers may receive the browser's public network address and mapped UDP port and handle this information under their own policies. NetDiag does not send WebRTC candidates to its application server in the default configuration.</p>
       <p>Browser settings or network restrictions can prevent STUN probes. The bandwidth test does not start until you select Start test.</p>
 
       <h2>Cookies, advertising, and analytics</h2>
