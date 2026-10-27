@@ -32,7 +32,8 @@
       <h2>Local ASN lookup</h2>
       <p>When enabled, the site looks up the directly connected peer IP address in a locally installed IPinfo or MaxMind ASN database to display an autonomous system number and organization name. Lookup requests are not sent to IPinfo or MaxMind. Database files are downloaded and updated separately by the site operator.</p>
 
-      <h2>TCP retransmission diagnostics</h2><p>On Linux, a speed test may collect temporary TCP retransmission counter differences on the server sockets handling the download and upload requests. A randomly generated, short-lived token associates those observations with one phase of the test. No persistent measurement history is stored by the default application.</p>
+      <h2>TCP retransmission diagnostics</h2>
+      <p>On Linux, running a speed test may collect temporary TCP retransmission counter differences on the server sockets that handle the download and upload requests. Random, short-lived per-phase tokens correlate these observations. They are not stored as a user history or sent to external analytics.</p>
 
       <h2>Storage and retention</h2>
       <p>The starter application does not provide user accounts or a persistent measurement database. Infrastructure such as a web proxy, hosting platform, or firewall may keep access and security logs. Log contents and retention periods depend on the operator's deployment and must be disclosed by that operator.</p>

@@ -113,6 +113,30 @@ func (o *Observer) purgeLocked(now time.Time) {
 
 func (o *Observer) Zone() string { return strings.TrimSuffix(o.cfg.Zone, ".") }
 
+// MatchHTTPSHost identifies requests for the configured observation zone.
+// The second result is true only for an unexpired, exactly matched challenge.
+// Only one label beneath the zone is accepted; unknown names remain private.
+func (o *Observer) MatchHTTPSHost(host string) (inZone, active bool) {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	zone := o.Zone()
+	if host == zone {
+		return true, false
+	}
+	suffix := "." + zone
+	if !strings.HasSuffix(host, suffix) {
+		return false, false
+	}
+	label := strings.TrimSuffix(host, suffix)
+	if label == "" || strings.Contains(label, ".") {
+		return true, false
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.purgeLocked(time.Now())
+	_, active = o.byLabel[label]
+	return true, active
+}
+
 func (o *Observer) StartSession(peer string) (Session, error) {
 	now := time.Now()
 	o.mu.Lock()

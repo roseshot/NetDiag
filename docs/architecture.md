@@ -7,7 +7,7 @@
 - `internal/diagnostics`: Linux-specific TCP_INFO reading; other platforms report unavailable.
 - `internal/ipmeta`: locally managed, startup-detected and background-hot-reloadable IPinfo or MaxMind ASN MMDB lookups with serialized reader switching.
 - `internal/dnsdiag`: optional authoritative DNS service with random, expiring sessions and bounded recursive DNS peer observations.
-- `internal/tcpwindow`: in-memory, per-peer, expiring TCP_INFO observation sessions; retains one baseline and the furthest end sample per observed TCP socket.
+- `internal/tcpwindow`: in-memory, per-peer, expiring TCP_INFO observation sessions with one baseline and the furthest end sample per observed TCP socket.
 - `web`: embeds the static browser client in the Go binary.
 - `web/assets/app.js`: runs lightweight homepage checks and starts bandwidth measurements only after user interaction.
 
@@ -19,12 +19,12 @@ The initial implementation intentionally does not include a database, cache serv
 2. ASN information comes from an automatically selected local IPinfo or GeoLite2 ASN MMDB, while DNS resolver observation remains opt-in and disabled unless authoritative DNS is configured.
 3. After the user clicks **Start test**, the browser stops outstanding STUN probes and measures idle HTTP RTT (P50 and jitter).
 4. JavaScript downloads streamed non-compressible data using 1, 4, 8, or 16 concurrent workers, while a separate loop measures loaded HTTP RTT.
-5. JavaScript uploads pseudorandom test payloads via XHR with progress reporting, bounded parallelism, and final byte counts only from successful server responses. Each load phase can create an independent TCP observation token, tag transfers, and request the socket retransmission delta after completion.
+5. JavaScript uploads pseudorandom test payloads via XHR with progress reporting, bounded parallelism, and final byte counts only from successful server responses. Each phase can create its own TCP_INFO window session, tag transfer requests, and read a one-time retransmission counter summary.
 6. Cancellation aborts active browser requests. The measured window uses elapsed monotonic time. Each server transfer also has a 30-second request context.
 
 ## Data integrity cautions
 
-- The server's TCP_INFO scope changes when a reverse proxy terminates TCP. Direct Go HTTPS termination is supported through certificate file environment variables. TCP window counters use one baseline and the highest end sample per accepted socket; HTTP/2 multiplexing, non-exclusive sockets, kernel send buffers and timing mean deltas cannot be attributed precisely to one HTTP transfer or to the end-to-end browser path.
+- The server's TCP_INFO scope changes when a reverse proxy terminates TCP. Direct Go HTTPS termination is supported through certificate file environment variables. Socket-level retransmission deltas cannot be perfectly attributed to HTTP requests with shared HTTP/2 sockets, unrelated traffic, or unacknowledged send buffers.
 - IPv4/IPv6 probe endpoints validate the direct socket family and ignore forwarding headers. DNS and TLS routing must force the expected address family; a public terminating proxy prevents reliable peer observation.
 - A stream is not a TCP connection when multiplexing is enabled.
 - Browser-side upload progress is only used for the live display; final upload speed uses confirmed complete request payloads and can underestimate partially completed work.
@@ -36,7 +36,7 @@ The initial implementation intentionally does not include a database, cache serv
 
 - `internal/ipmeta`: implemented IPinfo and MaxMind ASN MMDB lookup with provider-specific schemas; future work includes verified announced BGP prefixes and stale-data monitoring.
 - `internal/dnsdiag`: authoritative DNS challenge generation and resolver session correlation.
-- `internal/tcpdiag`: dedicated client-facing TCP probe listener and more rigorous socket/session isolation for independently verified per-test counters.
+- `internal/tcpdiag`: dedicated client-facing TCP probe listener and accurate socket/session isolation for independently verified per-test retransmission counts.
 - `internal/speedtest`: improved warm-up, automatic concurrency and calibrated measurement-window validation.
 - `internal/monitoring`: rate controls, transfer budgets, structured metrics.
 

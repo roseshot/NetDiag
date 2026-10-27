@@ -166,3 +166,38 @@ func TestNoCredentialsUsedByObserver(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestHTTPSChallengeHostLifecycle(t *testing.T) {
+	observer := New(testConfig())
+	session, err := observer.StartSession("192.0.2.77")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		host   string
+		inZone bool
+		active bool
+	}{
+		{session.Host, true, true},
+		{strings.ToUpper(session.Host) + ".", true, true},
+		{"observer.example.test", true, false},
+		{"invalid.observer.example.test", true, false},
+		{"nested." + session.Host, true, false},
+		{"notobserver.example.test", false, false},
+		{"example.test", false, false},
+	}
+	for _, tc := range cases {
+		zone, active := observer.MatchHTTPSHost(tc.host)
+		if zone != tc.inZone || active != tc.active {
+			t.Errorf("host %q: got zone=%t active=%t; want zone=%t active=%t",
+				tc.host, zone, active, tc.inZone, tc.active)
+		}
+	}
+	observer.mu.Lock()
+	observer.byID[session.ID].expires = time.Now().Add(-time.Second)
+	observer.mu.Unlock()
+	zone, active := observer.MatchHTTPSHost(session.Host)
+	if !zone || active {
+		t.Fatal("expired challenge should not serve a pixel")
+	}
+}
