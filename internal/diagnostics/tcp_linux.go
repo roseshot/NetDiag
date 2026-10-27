@@ -36,7 +36,7 @@ func readInfo(conn net.Conn) (syscall.TCPInfo, error) {
 			socketErr = errno
 		}
 	}); err != nil {
-		return nil, err
+		return syscall.TCPInfo{}, err
 	}
 	if socketErr != nil {
 		return syscall.TCPInfo{}, socketErr
