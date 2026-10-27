@@ -53,3 +53,86 @@ func TestOptionalRealDatabase(t *testing.T) {
 		t.Fatalf("unexpected status with real ASN database: %q", result.Status)
 	}
 }
+
+func TestIPinfoASNParsing(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		number uint
+		ok bool
+	}{
+		{"AS13335", 13335, true},
+		{"as64512", 64512, true},
+		{"AS4294967295", 4294967295, true},
+		{"", 0, false},
+		{"13335", 0, false},
+		{"AS0", 0, false},
+		{"ASgarbage", 0, false},
+		{"AS4294967296", 0, false},
+	} {
+		got, ok := parseIPinfoASN(tc.value)
+		if got != tc.number || ok != tc.ok {
+			t.Errorf("parseIPinfoASN(%q) = %d, %t; want %d, %t", tc.value, got, ok, tc.number, tc.ok)
+		}
+	}
+}
+
+func TestASNDatabaseTypeDetection(t *testing.T) {
+	for _, tc := range []struct {
+		kind string
+		provider string
+	}{
+		{DatabaseType, Source},
+		{"ipinfo bundle_location_lite.mmdb", SourceIPinfo},
+		{"ipinfo generic_country_free_country_asn.mmdb", SourceIPinfo},
+		{"ipinfo generic_country_free_asn.mmdb", SourceIPinfo},
+		{"ipinfo bundle_asn_asn.mmdb", SourceIPinfo},
+		{"GeoLite2-City", ""},
+		{"GeoLite2-Country", ""},
+		{"ipinfo generic_country_free_country.mmdb", ""},
+		{"unknown", ""},
+	} {
+		if got := providerFromMetadata(tc.kind); got != tc.provider {
+			t.Errorf("metadata type %q resolved to %q; want %q", tc.kind, got, tc.provider)
+		}
+	}
+}
+
+func TestAutoDetectFilesAndStatus(t *testing.T) {
+	dir := t.TempDir()
+	s := NewAuto("", dir)
+	if got := s.Status().Status; got != "not_configured" {
+		t.Fatalf("empty directory: got %q", got)
+	}
+	if len(s.paths) != len(filenames) {
+		t.Fatalf("got %d candidates, want %d", len(s.paths), len(filenames))
+	}
+	if filepath.Base(s.paths[0]) != "ipinfo_asn.mmdb" {
+		t.Fatal("IPinfo ASN should be preferred if several databases are present")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ipinfo_lite.mmdb"), []byte("not mmdb"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Refresh().Status; got != "unavailable" {
+		t.Fatalf("corrupt auto-detected database: got %q, want unavailable", got)
+	}
+	if err := os.Remove(filepath.Join(dir, "ipinfo_lite.mmdb")); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Refresh().Status; got != "not_configured" {
+		t.Fatalf("removed database: got %q, want not_configured", got)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExplicitDatabaseOverridesAutoDirectory(t *testing.T) {
+	dir := t.TempDir()
+	s := NewAuto(filepath.Join(dir, "chosen.mmdb"), dir)
+	if len(s.paths) != 1 || filepath.Base(s.paths[0]) != "chosen.mmdb" {
+		t.Fatalf("explicit override ignored: %+v", s.paths)
+	}
+	if got := s.Status().Status; got != "unavailable" {
+		t.Fatalf("missing explicit file: got %q, want unavailable", got)
+	}
+}

@@ -148,6 +148,7 @@ func TestASNLookupStatuses(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("NETDIAG_ASN_DB_PATH", tc.path)
+			t.Setenv("NETDIAG_ASN_DB_DIR", t.TempDir())
 			req := httptest.NewRequest(http.MethodGet, "/api/ip", nil)
 			req.RemoteAddr = tc.remote
 			req.Header.Set("X-Forwarded-For", "8.8.8.8")
@@ -168,8 +169,8 @@ func TestASNLookupStatuses(t *testing.T) {
 			if reply.IP != peerAddress(tc.remote) || reply.ASNStatus != tc.expected || reply.ASN != nil {
 				t.Errorf("unexpected ASN lookup response: %+v", reply)
 			}
-			if reply.ASNSource != "MaxMind GeoLite2 ASN" {
-				t.Errorf("missing data source attribution: %q", reply.ASNSource)
+			if reply.ASNSource != "" {
+				t.Errorf("unconfigured database must not claim a provider: %q", reply.ASNSource)
 			}
 		})
 	}

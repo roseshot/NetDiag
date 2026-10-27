@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/netip"
@@ -72,7 +73,10 @@ func (a *app) releasePeer(peer string) {
 }
 
 func New() http.Handler {
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: ipmeta.New(os.Getenv("NETDIAG_ASN_DB_PATH"))}
+	asn := ipmeta.NewAuto(os.Getenv("NETDIAG_ASN_DB_PATH"), os.Getenv("NETDIAG_ASN_DB_DIR"))
+	selected := asn.Status()
+	log.Printf("ASN database: status=%s source=%q type=%q", selected.Status, selected.Source, selected.DatabaseType)
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -188,9 +192,11 @@ func (a *app) ip(w http.ResponseWriter, r *http.Request) {
 		"asn":                number,
 		"asnStatus":          info.Status,
 		"asnOrganization":    info.Organization,
+		"asnDomain":          info.Domain,
 		"asnNetwork":         info.Network,
 		"asnDatabaseBuiltAt": info.DatabaseTime,
-		"asnSource":          ipmeta.Source,
+		"asnSource":          info.Source,
+		"asnDatabaseType":    info.DatabaseType,
 		"scope":              "direct_peer",
 	})
 }
