@@ -180,10 +180,10 @@ func TestHTTPSChallengeHostLifecycle(t *testing.T) {
 	}{
 		{session.Host, true, true},
 		{strings.ToUpper(session.Host) + ".", true, true},
-		{"observe.example.test", true, false},
-		{"invalid.observe.example.test", true, false},
+		{"observer.example.test", true, false},
+		{"invalid.observer.example.test", true, false},
 		{"nested." + session.Host, true, false},
-		{"notobserve.example.test", false, false},
+		{"notobserver.example.test", false, false},
 		{"example.test", false, false},
 	}
 	for _, tc := range cases {
