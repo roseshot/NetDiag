@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	sessionTTL = 60 * time.Second
-	maxSessions = 512
-	maxSessionsPerPeer = 4
+	sessionTTL           = 60 * time.Second
+	maxSessions          = 512
+	maxSessionsPerPeer   = 4
 	maxSocketsPerSession = 32
 )
 
@@ -24,35 +24,35 @@ type Sample func(net.Conn) (uint32, error)
 
 type socketStats struct {
 	baseline uint32
-	delta uint32
+	delta    uint32
 	finished bool
 }
 
 type session struct {
-	owner string
-	expires time.Time
-	sockets map[net.Conn]*socketStats
-	active int
+	owner     string
+	expires   time.Time
+	sockets   map[net.Conn]*socketStats
+	active    int
 	completed int
-	failures int
+	failures  int
 }
 
 type Result struct {
-	Status string `json:"status"`
-	Retransmissions uint64 `json:"retransmissions"`
-	Connections int `json:"connections"`
-	CompletedRequests int `json:"completedRequests"`
-	ActiveRequests int `json:"activeRequests"`
-	FailedSamples int `json:"failedSamples"`
-	Scope string `json:"scope"`
-	Note string `json:"note"`
+	Status            string `json:"status"`
+	Retransmissions   uint64 `json:"retransmissions"`
+	Connections       int    `json:"connections"`
+	CompletedRequests int    `json:"completedRequests"`
+	ActiveRequests    int    `json:"activeRequests"`
+	FailedSamples     int    `json:"failedSamples"`
+	Scope             string `json:"scope"`
+	Note              string `json:"note"`
 }
 
 type Manager struct {
-	mu sync.Mutex
+	mu       sync.Mutex
 	sessions map[string]*session
-	sample Sample
-	now func() time.Time
+	sample   Sample
+	now      func() time.Time
 }
 
 func New(sample Sample) *Manager {
@@ -85,11 +85,17 @@ func (m *Manager) Start(owner string) (string, time.Time, error) {
 	}
 	peerSessions := 0
 	for _, s := range m.sessions {
-		if s.owner == owner { peerSessions++ }
+		if s.owner == owner {
+			peerSessions++
+		}
 	}
-	if peerSessions >= maxSessionsPerPeer { return "", time.Time{}, ErrLimit }
+	if peerSessions >= maxSessionsPerPeer {
+		return "", time.Time{}, ErrLimit
+	}
 	token, err := newToken()
-	if err != nil { return "", time.Time{}, err }
+	if err != nil {
+		return "", time.Time{}, err
+	}
 	expires := m.now().Add(sessionTTL)
 	m.sessions[token] = &session{owner: owner, expires: expires, sockets: make(map[net.Conn]*socketStats)}
 	return token, expires, nil
@@ -107,7 +113,9 @@ func (m *Manager) Begin(token, owner string, conn net.Conn) func() {
 	defer m.mu.Unlock()
 	m.purgeLocked()
 	s := m.sessions[token]
-	if s == nil || s.owner != owner { return nil }
+	if s == nil || s.owner != owner {
+		return nil
+	}
 	if m.sample == nil {
 		s.failures++
 		return nil
@@ -140,7 +148,9 @@ func (m *Manager) Begin(token, owner string, conn net.Conn) func() {
 		// TCP_INFO counters are uint32 and may wrap around. A single window
 		// is capped at one minute; modulo subtraction handles a single wrap.
 		delta := after - stats.baseline
-		if !stats.finished || delta > stats.delta { stats.delta = delta }
+		if !stats.finished || delta > stats.delta {
+			stats.delta = delta
+		}
 		stats.finished = true
 	}
 }
@@ -152,13 +162,15 @@ func (m *Manager) Read(token, owner string) (Result, bool) {
 	defer m.mu.Unlock()
 	m.purgeLocked()
 	s := m.sessions[token]
-	if s == nil || s.owner != owner { return Result{}, false }
+	if s == nil || s.owner != owner {
+		return Result{}, false
+	}
 	result := Result{
-		Scope: "server_tcp_sockets",
+		Scope:             "server_tcp_sockets",
 		CompletedRequests: s.completed,
-		ActiveRequests: s.active,
-		FailedSamples: s.failures,
-		Note: "TCP_INFO totals describe Go-accepted sockets, including shared HTTP/2 traffic or proxy-to-Go connections; this is not an end-to-end packet loss rate.",
+		ActiveRequests:    s.active,
+		FailedSamples:     s.failures,
+		Note:              "TCP_INFO totals describe Go-accepted sockets, including shared HTTP/2 traffic or proxy-to-Go connections; this is not an end-to-end packet loss rate.",
 	}
 	for _, sock := range s.sockets {
 		if sock.finished {
@@ -174,6 +186,8 @@ func (m *Manager) Read(token, owner string) (Result, bool) {
 	default:
 		result.Status = "completed"
 	}
-	if s.active == 0 { delete(m.sessions, token) }
+	if s.active == 0 {
+		delete(m.sessions, token)
+	}
 	return result, true
 }
