@@ -32,7 +32,7 @@ func startupFeatures(a *app, platform string) []startupFeature {
 	}
 
 	if platform == "linux" {
-		features = append(features, startupFeature{"TCP diagnostics", "enabled", "Linux TCP_INFO; server-side socket only"})
+		features = append(features, startupFeature{"TCP diagnostics", "enabled", "Linux TCP_INFO and per-phase retransmission deltas; server-side sockets only"})
 	} else {
 		features = append(features, startupFeature{"TCP diagnostics", "unavailable", "Linux TCP_INFO requires Linux"})
 	}

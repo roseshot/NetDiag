@@ -68,3 +68,11 @@ Per-peer concurrency limits count the direct TCP peer; deployments behind a reve
 ## Important note on TCP diagnostics
 
 If HTTPS ends at Caddy/Nginx and Go runs behind it, the server socket TCP_INFO belongs to the **proxy-to-Go** connection. A separately terminated Go TCP/TLS diagnostic endpoint is needed to measure the public client-facing server socket. The current UI makes this distinction explicit.
+
+## Per-phase TCP retransmission observation
+
+On Linux, the browser can open a temporary session with `POST /api/diag/tcp/window`, tag download/upload requests with `X-NetDiag-Window`, and read the one-time result from `GET /api/diag/tcp/window?token=...`. There is no data collection unless a speed test starts. Each phase uses its own random token and the direct HTTP peer IP for access control. Sessions expire after 60 seconds; at most 512 sessions exist per server process, with a limit of four per peer and 32 unique TCP sockets per session.
+
+The session computes one `TCP_INFO.Total_retrans` difference per physical socket and sums these differences. It does **not** add overlapping HTTP requests on a shared socket. This is **not** a validated end-to-end packet loss or retransmission rate. On HTTP/2/3 frontends, TLS-terminating proxies or other multiplexed environments, the TCP socket can carry other requests and may be the proxy-to-Go hop. An aborted transfer or a closed socket can make the summary unavailable. Test locally with direct Go TLS and relevant controlled traffic before interpreting values.
+
+Only the token, peer address and per-socket numeric snapshots are held temporarily in process memory. The browser displays `Unavailable` when samples cannot be collected, never a fabricated zero.

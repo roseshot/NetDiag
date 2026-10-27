@@ -8,6 +8,7 @@ This document distinguishes delivered scaffold behavior from future work.
 - Idle HTTP RTT/jitter probes and load-time RTT measurements (P50, P95 and added latency).
 - Single/multi-stream downloads and uploads, with final upload bytes verified by server acknowledgement.
 - Linux server-side TCP_INFO and direct-peer IP display.
+- Per-download/upload-stage, short-lived, peer-bound TCP_INFO retransmission delta observation on the unique sockets carrying tagged transfers.
 - Optional IPinfo or MaxMind ASN MMDB lookups with startup auto-detection, schema-aware parsing, integrity validation, background polling/hot reload, retention of the last verified snapshot on invalid updates, source attribution and safe unavailable states.
 - Configurable IPv4/IPv6 independent probe origins, address-family verification, limited cross-origin access and browser HTTP RTT checks.
 - Optional direct Go HTTPS listener using externally managed certificates.
@@ -20,7 +21,7 @@ This document distinguishes delivered scaffold behavior from future work.
 ## Planned, not yet implemented
 
 1. Calibrated transfer window with warm-up, session accounting, in-flight upload byte reconciliation, adaptive parallelism and reference benchmark validation.
-2. Direct client-facing TCP diagnostic listener and proper per-test retransmission deltas.
+2. Dedicated client-facing TCP diagnostics and accurately attributable retransmission deltas (current socket-window sampling cannot isolate multiplexed traffic).
 3. Production dual-stack deployments and cross-network browser validation of independent IPv4/IPv6 probe origins.
 4. Production ASN database freshness alerting and independent BGP prefix verification (GeoLite matching ranges are not announced BGP prefixes).
 5. Production DNS delegation and wildcard TLS routing validation, resolver-forwarding accuracy studies and browser interoperability testing.

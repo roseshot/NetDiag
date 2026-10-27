@@ -9,16 +9,15 @@ import (
 	"unsafe"
 )
 
-// TCPInfo reports kernel-side statistics for the accepted server socket.
-// Total retransmissions cover the connection lifetime, not a test window.
-func TCPInfo(conn net.Conn) (map[string]any, error) {
+// readInfo reads kernel-side information from an accepted TCP socket.
+func readInfo(conn net.Conn) (syscall.TCPInfo, error) {
 	tcp, ok := conn.(*net.TCPConn)
 	if !ok {
-		return nil, errors.New("not a TCP socket")
+		return syscall.TCPInfo{}, errors.New("not a TCP socket")
 	}
 	raw, err := tcp.SyscallConn()
 	if err != nil {
-		return nil, err
+		return syscall.TCPInfo{}, err
 	}
 	var info syscall.TCPInfo
 	var socketErr error
@@ -40,7 +39,27 @@ func TCPInfo(conn net.Conn) (map[string]any, error) {
 		return nil, err
 	}
 	if socketErr != nil {
-		return nil, socketErr
+		return syscall.TCPInfo{}, socketErr
+	}
+	return info, nil
+}
+
+// RetransmissionTotal returns the 32-bit Linux kernel total-retrans counter
+// for this accepted TCP connection, independent of a test session.
+func RetransmissionTotal(conn net.Conn) (uint32, error) {
+	info, err := readInfo(conn)
+	if err != nil {
+		return 0, err
+	}
+	return info.Total_retrans, nil
+}
+
+// TCPInfo reports kernel-side statistics for the accepted server socket.
+// Total retransmissions cover the connection lifetime, not a test window.
+func TCPInfo(conn net.Conn) (map[string]any, error) {
+	info, err := readInfo(conn)
+	if err != nil {
+		return nil, err
 	}
 	return map[string]any{
 		"status":                   "completed",

@@ -11,7 +11,7 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Single-stream and 4/8/16 concurrent-stream download and upload tests with a common timed measurement window.
 - Server-confirmed upload byte accounting for completed requests; aborted or incomplete uploads are excluded from final results.
 - Live bandwidth display, cancellation, bounded transfer sizes, a 64-transfer global limit and a 20-transfer per-peer limit.
-- Server-observed IP address, automatically detected and hot-reloadable local IPinfo/MaxMind ASN lookups, and Linux TCP_INFO diagnostics.
+- Server-observed IP address, automatically detected and hot-reloadable local IPinfo/MaxMind ASN lookups, Linux TCP_INFO diagnostics and optional per-phase retransmission deltas from tagged speed-test sockets.
 - Optional independent IPv4/IPv6 connectivity probes with separate observed addresses and HTTP RTT samples.
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
@@ -82,7 +82,9 @@ At startup, NetDiag automatically detects supported **IPinfo ASN, IPinfo Lite an
 | GET | `/api/download?bytes=4194304` | Uncompressed, streamed test bytes (max 16 MiB/request) |
 | POST | `/api/upload` | Receive and discard request body (max 16 MiB/request) |
 | GET | `/api/ip` | Direct peer IP, address family, and locally detected IPinfo or MaxMind ASN metadata |
-| GET | `/api/diag/tcp` | Server TCP_INFO on Linux, if an accepted TCP socket is accessible |
+| GET | `/api/diag/tcp` | Current accepted server TCP socket's lifetime TCP_INFO on Linux |
+| POST | `/api/diag/tcp/window` | Start a short-lived per-phase server TCP observation session (Linux) |
+| GET | `/api/diag/tcp/window?token=...` | One-time retransmission delta summary for tagged transfer sockets |
 | GET | `/api/diag/address?family=4` | Require an actual IPv4 peer (409 on family mismatch) |
 | GET | `/api/diag/address?family=6` | Require an actual IPv6 peer (409 on family mismatch) |
 | POST | `/api/dns/start` | Start an opt-in, short-lived DNS challenge |
@@ -126,7 +128,7 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - **Concurrency means concurrent HTTP streams/requests**, not necessarily distinct TCP connections. HTTP/2 may multiplex them.
 - Upload live speed uses browser-side XHR progress events, but **final upload results include only complete requests acknowledged by the Go server**. The result can understate throughput on slow or interrupted links because incomplete in-flight uploads are intentionally excluded.
 - Download speed uses bytes actually read by the browser and measured elapsed time. Loaded latency is HTTP RTT sampled while each transfer stage runs, compared with the idle RTT median. Sampling and throughput results have not been calibrated against reference measurement tools.
-- `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter, not a per-test retransmission delta.
+- `TCP_INFO` measures the **Go server's socket**. If a reverse proxy or load balancer terminates the browser connection, the results describe the upstream socket, **not** the browser-to-edge path. `totalRetransmissions` is a lifetime counter. Download and upload phases now additionally collect opt-in `TCP_INFO` counter differences across the unique Go-accepted sockets that carried tagged transfer requests. This is an **observed socket delta**, not a precise end-to-end packet-loss measurement; multiplexed HTTP/2 sockets may carry unrelated traffic, and stats may be unavailable if connections close before sampling.
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
 - ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery includes an authoritative DNS observer and an HTTPS pixel endpoint, but requires public DNS delegation, UDP/TCP 53 reachability, wildcard TLS configuration and hostname routing.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.

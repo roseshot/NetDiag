@@ -225,11 +225,12 @@ function makePayload(size) {
 
 // Only successful responses with an exact server byte acknowledgement
 // contribute to the final upload result. Progress is for the live UI only.
-function uploadOnce(payload, signal, onProgress) {
+function uploadOnce(payload, signal, onProgress, windowToken) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
     xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    if (windowToken) xhr.setRequestHeader("X-NetDiag-Window", windowToken);
     let last = 0;
     const abort = () => xhr.abort();
     const cleanup = () => signal.removeEventListener("abort", abort);
@@ -266,9 +267,45 @@ function uploadOnce(payload, signal, onProgress) {
   });
 }
 
+// A TCP_INFO observation is optional and never prevents throughput tests.
+// Read the summary only after transfers settle; a pending result is not zero.
+async function beginTCPWindow(signal) {
+  try {
+    const created = await getJSON("/api/diag/tcp/window", { method: "POST", signal });
+    return /^[A-Z2-7]{39}$/.test(created.token || "") ? created.token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readTCPWindow(token, signal) {
+  if (!token || signal.aborted) return null;
+  for (let i = 0; i < 6; i++) {
+    try {
+      const result = await getJSON("/api/diag/tcp/window?token=" + encodeURIComponent(token), { signal });
+      if (result.status !== "pending") return result;
+    } catch {
+      return null;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return null;
+}
+
+function showTCPWindow(kind, result) {
+  const element = kind === "download" ? "tcp-download-delta" : "tcp-upload-delta";
+  if (result?.status === "completed" && Number.isSafeInteger(result.retransmissions)) {
+    set(element, String(result.retransmissions) + " (observed on " + result.connections + " socket(s))");
+  } else {
+    set(element, "Unavailable");
+  }
+}
+
 // Each phase uses a common deadline. The upload result intentionally excludes
 // bytes from incomplete/aborted requests, so it can understate link capacity.
 async function timedTransfer(kind, streams, seconds, parentSignal) {
+  checkCancel(parentSignal);
+  const windowToken = await beginTCPWindow(parentSignal);
   checkCancel(parentSignal);
   const controller = new AbortController();
   const cancel = () => controller.abort();
@@ -300,6 +337,7 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
         if (kind === "download") {
           const response = await fetch("/api/download?bytes=" + testConfig.downloadRequestBytes, {
             cache: "no-store",
+            headers: windowToken ? { "X-NetDiag-Window": windowToken } : {},
             signal: controller.signal
           });
           if (!response.ok || !response.body) throw new Error("Download returned HTTP " + response.status);
@@ -313,7 +351,7 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
         } else {
           confirmedBytes += await uploadOnce(payload, controller.signal, (delta) => {
             progressBytes += delta;
-          });
+          }, windowToken);
         }
         completedRequests++;
       } catch (error) {
@@ -339,6 +377,7 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
   }
 
   checkCancel(parentSignal);
+  const tcp = await readTCPWindow(windowToken, parentSignal);
   if (fatalError) throw fatalError;
   if (confirmedBytes <= 0 || (kind === "upload" && completedRequests === 0)) {
     throw new Error(kind === "upload" ?
@@ -350,7 +389,8 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
     confirmedBytes,
     elapsedMs,
     completedRequests,
-    latency
+    latency,
+    tcp
   };
 }
 
@@ -368,7 +408,8 @@ async function startTest() {
   $("start").disabled = true;
   $("stop").disabled = false;
   for (const id of ["ping", "jitter", "download", "upload", "download-loaded",
-    "upload-loaded", "download-p95", "upload-p95"]) set(id, "—");
+    "upload-loaded", "download-p95", "upload-p95",
+    "tcp-download-delta", "tcp-upload-delta"]) set(id, "—");
   set("live-speed", "0.00");
   const streams = Number($("streams").value);
   try {
@@ -381,11 +422,13 @@ async function startTest() {
     const download = await timedTransfer("download", streams, testConfig.durationSeconds, controller.signal);
     set("download", fmt(download.mbps));
     showLoadedLatency("download", idle, download.latency);
+    showTCPWindow("download", download.tcp);
 
     set("phase", "Measuring upload and loaded latency with " + streams + " stream(s)...");
     const upload = await timedTransfer("upload", streams, testConfig.durationSeconds, controller.signal);
     set("upload", fmt(upload.mbps));
     showLoadedLatency("upload", idle, upload.latency);
+    showTCPWindow("upload", upload.tcp);
 
     set("phase", "Test completed · upload counts only server-confirmed requests");
     set("live-speed", fmt(upload.mbps));

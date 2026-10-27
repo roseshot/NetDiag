@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/roseshot/NetDiag/internal/diagnostics"
 	"github.com/roseshot/NetDiag/internal/dnsdiag"
 	"github.com/roseshot/NetDiag/internal/ipmeta"
+	"github.com/roseshot/NetDiag/internal/tcpwindow"
 	"github.com/roseshot/NetDiag/web"
 )
 
@@ -47,6 +49,7 @@ type app struct {
 	probes      probeConfig
 	asn         *ipmeta.Store
 	dnsObserver *dnsdiag.Observer
+	tcpWindows  *tcpwindow.Manager
 }
 
 func peerAddress(remote string) string {
@@ -128,7 +131,7 @@ func asnReloadInterval() time.Duration {
 
 func newHandler(observer *dnsdiag.Observer) (http.Handler, *app) {
 	asn := ipmeta.NewAuto(os.Getenv("NETDIAG_ASN_DB_PATH"), os.Getenv("NETDIAG_ASN_DB_DIR"))
-	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn, dnsObserver: observer}
+	a := &app{slots: make(chan struct{}, 64), block: make([]byte, 32<<10), activePeers: make(map[string]int), probes: loadProbeConfig(), asn: asn, dnsObserver: observer, tcpWindows: tcpwindow.New(diagnostics.RetransmissionTotal)}
 	if _, err := rand.Read(a.block); err != nil {
 		panic(err)
 	}
@@ -138,6 +141,7 @@ func newHandler(observer *dnsdiag.Observer) (http.Handler, *app) {
 	mux.HandleFunc("/api/ping", a.ping)
 	mux.HandleFunc("/api/ip", a.ip)
 	mux.HandleFunc("/api/diag/tcp", a.tcp)
+	mux.HandleFunc("/api/diag/tcp/window", a.tcpWindow)
 	mux.HandleFunc("/api/diag/address", a.address)
 	mux.HandleFunc("/api/dns/start", a.dnsStart)
 	mux.HandleFunc("/api/dns/result", a.dnsResult)
@@ -286,6 +290,51 @@ func (a *app) tcp(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, stats)
 }
 
+// tcpWindow starts a short-lived upload/download TCP_INFO observation or
+// returns its one-time result, bound to the direct HTTP peer and secret token.
+func (a *app) tcpWindow(w http.ResponseWriter, r *http.Request) {
+	if runtime.GOOS != "linux" {
+		respondJSON(w, map[string]any{"status": "unavailable", "reason": "linux_only"})
+		return
+	}
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	owner := peerAddress(r.RemoteAddr)
+	switch r.Method {
+	case http.MethodPost:
+		if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" {
+			http.Error(w, "cross-site sessions are not supported", http.StatusForbidden)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" && !sameRequestOrigin(r, origin) {
+			http.Error(w, "invalid origin", http.StatusForbidden)
+			return
+		}
+		token, expires, err := a.tcpWindows.Start(owner)
+		if err != nil {
+			w.Header().Set("Retry-After", "10")
+			http.Error(w, "TCP observation capacity exceeded", http.StatusTooManyRequests)
+			return
+		}
+		respondJSON(w, map[string]any{"token": token, "expiresAt": expires.UTC().Format(time.RFC3339)})
+	case http.MethodGet:
+		token := r.URL.Query().Get("token")
+		if len(token) != 39 {
+			http.Error(w, "TCP window not found", http.StatusNotFound)
+			return
+		}
+		result, ok := a.tcpWindows.Read(token, owner)
+		if !ok {
+			http.Error(w, "TCP window not found", http.StatusNotFound)
+			return
+		}
+		respondJSON(w, result)
+	}
+}
+
 func (a *app) transfer(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -302,6 +351,14 @@ func (a *app) transfer(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		defer a.releasePeer(peer)
+		// A valid per-phase token binds the transfer to its accepted socket.
+		// A socket may carry many requests (especially with HTTP/2), so the
+		// window manager counts the counter change at most once per socket.
+		if conn, ok := r.Context().Value(connectionKey{}).(net.Conn); ok {
+			if finish := a.tcpWindows.Begin(r.Header.Get("X-NetDiag-Window"), peer, conn); finish != nil {
+				defer finish()
+			}
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 		next(w, r.WithContext(ctx))

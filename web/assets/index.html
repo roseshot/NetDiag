@@ -91,13 +91,15 @@
           <div class="card-head"><h3 id="tcp-heading">TCP diagnostics</h3><span id="tcp-state" class="state">Checking</span></div>
           <dl><div><dt>Server TCP RTT</dt><dd id="tcp-rtt">—</dd></div>
             <div><dt>Total retransmissions</dt><dd id="tcp-retrans">—</dd></div>
+            <div><dt>Download retransmission delta</dt><dd id="tcp-download-delta">—</dd></div>
+            <div><dt>Upload retransmission delta</dt><dd id="tcp-upload-delta">—</dd></div>
             <div><dt>Send MSS</dt><dd id="tcp-mss">—</dd></div></dl>
           <details><summary>Connection details</summary>
             <dl><div><dt>Receive MSS</dt><dd id="tcp-receive-mss">—</dd></div>
               <div><dt>Path MTU</dt><dd id="tcp-pmtu">—</dd></div>
               <div><dt>RTT variance</dt><dd id="tcp-rttvar">—</dd></div></dl>
           </details>
-          <p class="hint">Server-side TCP_INFO on Linux. Behind a TLS reverse proxy, these values describe the proxy-to-server connection.</p>
+          <p class="hint">Server-side TCP_INFO on Linux. Delta measurements are taken from TCP sockets serving tagged speed-test transfers; shared HTTP/2 connections may include unrelated traffic, and results may be unavailable. Behind a TLS reverse proxy, these values describe proxy-to-Go traffic, not the browser-to-edge connection.</p>
         </section>
 
         <section class="card" aria-labelledby="dns-heading">
