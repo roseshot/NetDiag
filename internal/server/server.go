@@ -73,6 +73,45 @@ func (a *app) releasePeer(peer string) {
 }
 
 func New() http.Handler {
+	handler, _ := newHandler()
+	return handler
+}
+
+// NewWithContext starts a background ASN database watcher for the running
+// HTTP service. The returned cleanup function stops the watcher, waits for
+// it to exit, and closes the MMDB reader.
+func NewWithContext(ctx context.Context) (http.Handler, func()) {
+	handler, database := newHandler()
+	watchCtx, cancel := context.WithCancel(ctx)
+	done := database.Watch(watchCtx, asnReloadInterval())
+	var once sync.Once
+	closeASN := func() {
+		once.Do(func() {
+			cancel()
+			<-done
+			if err := database.Close(); err != nil {
+				log.Printf("ASN database close: %v", err)
+			}
+		})
+	}
+	return handler, closeASN
+}
+
+func asnReloadInterval() time.Duration {
+	const fallback = 5 * time.Second
+	raw := os.Getenv("NETDIAG_ASN_RELOAD_INTERVAL")
+	if raw == "" {
+		return fallback
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil || value < time.Second || value > time.Hour {
+		log.Printf("Invalid NETDIAG_ASN_RELOAD_INTERVAL %q; using %s", raw, fallback)
+		return fallback
+	}
+	return value
+}
+
+func newHandler() (http.Handler, *ipmeta.Store) {
 	asn := ipmeta.NewAuto(os.Getenv("NETDIAG_ASN_DB_PATH"), os.Getenv("NETDIAG_ASN_DB_DIR"))
 	selected := asn.Status()
 	log.Printf("ASN database: status=%s source=%q type=%q", selected.Status, selected.Source, selected.DatabaseType)
@@ -90,7 +129,7 @@ func New() http.Handler {
 	mux.HandleFunc("/api/download", a.transfer(a.download))
 	mux.HandleFunc("/api/upload", a.transfer(a.upload))
 	mux.Handle("/", http.FileServer(http.FS(web.Files())))
-	return securityHeaders(mux, a.probes)
+	return securityHeaders(mux, a.probes), asn
 }
 
 func securityHeaders(next http.Handler, probes probeConfig) http.Handler {
@@ -197,6 +236,7 @@ func (a *app) ip(w http.ResponseWriter, r *http.Request) {
 		"asnDatabaseBuiltAt": info.DatabaseTime,
 		"asnSource":          info.Source,
 		"asnDatabaseType":    info.DatabaseType,
+		"asnReloadStatus":    info.ReloadStatus,
 		"scope":              "direct_peer",
 	})
 }

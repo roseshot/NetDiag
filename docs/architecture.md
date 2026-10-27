@@ -5,7 +5,7 @@
 - `cmd/netdiag`: starts the HTTP server and handles graceful shutdown.
 - `internal/server`: exposes bounded, cache-disabled measurement endpoints, IP observation, independent IPv4/IPv6 probe endpoints with strict CORS and TCP diagnostic access.
 - `internal/diagnostics`: Linux-specific TCP_INFO reading; other platforms report unavailable.
-- `internal/ipmeta`: locally managed, startup-detected, checked and reloadable IPinfo or MaxMind ASN MMDB lookups.
+- `internal/ipmeta`: locally managed, startup-detected and background-hot-reloadable IPinfo or MaxMind ASN MMDB lookups with serialized reader switching.
 - `web`: embeds the static browser client in the Go binary.
 - `web/assets/app.js`: runs lightweight homepage checks and starts bandwidth measurements only after user interaction.
 

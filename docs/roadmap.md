@@ -8,7 +8,7 @@ This document distinguishes delivered scaffold behavior from future work.
 - Idle HTTP RTT/jitter probes and load-time RTT measurements (P50, P95 and added latency).
 - Single/multi-stream downloads and uploads, with final upload bytes verified by server acknowledgement.
 - Linux server-side TCP_INFO and direct-peer IP display.
-- Optional IPinfo or MaxMind ASN MMDB lookups with startup auto-detection, schema-aware parsing, integrity validation, file-change detection, source attribution and safe unavailable states.
+- Optional IPinfo or MaxMind ASN MMDB lookups with startup auto-detection, schema-aware parsing, integrity validation, background polling/hot reload, retention of the last verified snapshot on invalid updates, source attribution and safe unavailable states.
 - Configurable IPv4/IPv6 independent probe origins, address-family verification, limited cross-origin access and browser HTTP RTT checks.
 - Optional direct Go HTTPS listener using externally managed certificates.
 - Configurable public WebRTC STUN probes with disabled-WebRTC fallback.

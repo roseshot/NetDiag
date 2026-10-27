@@ -44,7 +44,7 @@ Each independent probe makes four small browser requests per family when configu
 
 ## ASN database deployment
 
-The Compose example mounts `./data` read-only at `/var/lib/netdiag` and sets `NETDIAG_ASN_DB_DIR`. NetDiag automatically discovers supported IPinfo or MaxMind ASN MMDB filenames at startup. Download and update the files separately. Lookups remain local and reload valid atomic database replacements. Use `NETDIAG_ASN_DB_PATH` only to override detection. Check licensing, freshness, file permissions and the operator's network retention policies. See `docs/asn.md`.
+The Compose example mounts `./data` read-only at `/var/lib/netdiag` and sets `NETDIAG_ASN_DB_DIR`. NetDiag automatically discovers supported IPinfo or MaxMind ASN MMDB filenames at startup. Download and update the files separately. Lookups remain local. While the server runs, a background watcher checks database files every 5 seconds by default and hot-swaps verified replacements without waiting for a request. Configure `NETDIAG_ASN_RELOAD_INTERVAL` (between `1s` and `1h`) to override that cadence. Never modify a memory-mapped MMDB in place; use atomic replacement. Invalid updates retain the last known good database and mark the reload status as stale. Use `NETDIAG_ASN_DB_PATH` only to override detection. Check licensing, freshness, file permissions and the operator's network retention policies. See `docs/asn.md`.
 
 ## Resource limits currently implemented
 

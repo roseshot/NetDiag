@@ -25,16 +25,19 @@ func main() {
 		log.Fatal("NETDIAG_TLS_CERT_FILE and NETDIAG_TLS_KEY_FILE must be configured together")
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	handler, closeASN := server.NewWithContext(ctx)
+	defer closeASN()
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           server.New(),
+		Handler:           handler,
 		ConnContext:       server.ConnContext,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {

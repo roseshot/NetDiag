@@ -11,7 +11,7 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Single-stream and 4/8/16 concurrent-stream download and upload tests with a common timed measurement window.
 - Server-confirmed upload byte accounting for completed requests; aborted or incomplete uploads are excluded from final results.
 - Live bandwidth display, cancellation, bounded transfer sizes, a 64-transfer global limit and a 20-transfer per-peer limit.
-- Server-observed IP address, automatically detected local IPinfo/MaxMind ASN lookups, and Linux TCP_INFO diagnostics.
+- Server-observed IP address, automatically detected and hot-reloadable local IPinfo/MaxMind ASN lookups, and Linux TCP_INFO diagnostics.
 - Optional independent IPv4/IPv6 connectivity probes with separate observed addresses and HTTP RTT samples.
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
@@ -47,7 +47,7 @@ docker compose up --build
 
 ## Local IPinfo and MaxMind ASN databases
 
-At startup, NetDiag automatically detects supported **IPinfo ASN, IPinfo Lite and MaxMind GeoLite2 ASN** MMDB files from its local database directory. Use `NETDIAG_ASN_DB_DIR` to select the directory (default `./data`), or `NETDIAG_ASN_DB_PATH` to override discovery with one explicit file. The MMDB type is validated before use. Queries are local and no credentials or databases are bundled. See [ASN setup, priority order, updates and licensing](docs/asn.md).
+At startup, NetDiag automatically detects supported **IPinfo ASN, IPinfo Lite and MaxMind GeoLite2 ASN** MMDB files from its local database directory. Use `NETDIAG_ASN_DB_DIR` to select the directory (default `./data`), or `NETDIAG_ASN_DB_PATH` to override discovery with one explicit file. The MMDB type is validated before use. When the server runs, a background watcher checks for valid atomic file replacements (default every 5 seconds) without waiting for an HTTP request. Failed replacements retain the last verified snapshot and expose a stale database status. Set `NETDIAG_ASN_RELOAD_INTERVAL=10s` to adjust the interval (1 second–1 hour). Queries are local and no credentials or databases are bundled. See [ASN setup, priority order, updates and licensing](docs/asn.md).
 
 ## API
 

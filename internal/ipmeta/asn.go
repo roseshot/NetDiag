@@ -1,6 +1,8 @@
 package ipmeta
 
 import (
+	"context"
+	"log"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -49,6 +51,7 @@ type Result struct {
 	DatabaseTime string
 	Source       string
 	DatabaseType string
+	ReloadStatus string
 }
 
 type Store struct {
@@ -93,13 +96,44 @@ func NewAuto(explicitPath, directory string) *Store {
 	return s
 }
 
-// Refresh forces immediate redetection; regular lookups check once per minute.
+// Refresh forces immediate redetection, independent of incoming HTTP traffic.
 func (s *Store) Refresh() Result {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.checkedAt = time.Time{}
 	s.detectLocked()
 	return s.statusLocked()
+}
+
+// Watch scans candidate files on a ticker, even when no requests arrive.
+// Cancellation is explicit; the returned channel closes when the worker exits.
+// The owner must stop the worker before calling Close.
+func (s *Store) Watch(ctx context.Context, interval time.Duration) <-chan struct{} {
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				before := s.Status()
+				after := s.Refresh()
+				if before.ReloadStatus != after.ReloadStatus ||
+					before.Source != after.Source ||
+					before.DatabaseType != after.DatabaseType ||
+					before.DatabaseTime != after.DatabaseTime {
+					log.Printf("ASN database reload: status=%s source=%q type=%q", after.ReloadStatus, after.Source, after.DatabaseType)
+				}
+			}
+		}
+	}()
+	return done
 }
 
 func (s *Store) Status() Result {
@@ -110,7 +144,7 @@ func (s *Store) Status() Result {
 }
 
 func (s *Store) statusLocked() Result {
-	return Result{Status: s.status, Source: s.provider, DatabaseType: s.dbType, DatabaseTime: s.buildTime}
+	return Result{Status: s.status, Source: s.provider, DatabaseType: s.dbType, DatabaseTime: s.buildTime, ReloadStatus: s.status}
 }
 
 func (s *Store) Close() error {
@@ -209,6 +243,12 @@ func (s *Store) detectLocked() {
 		}
 		return
 	}
+	// Keep serving the last verified snapshot if its replacement is broken
+	// or temporarily missing, while reporting stale reload health.
+	if s.reader != nil {
+		s.status = "stale"
+		return
+	}
 	s.dropLocked()
 	if s.explicit || seen {
 		s.status = "unavailable"
@@ -242,6 +282,8 @@ func (s *Store) Lookup(ip netip.Addr) Result {
 		return Result{Status: s.status}
 	}
 	details := s.statusLocked()
+	// Lookups from the last verified snapshot remain usable while stale.
+	details.Status = "completed"
 	match := s.reader.Lookup(ip)
 	if s.provider == Source {
 		var record Record

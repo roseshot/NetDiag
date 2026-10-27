@@ -6,6 +6,7 @@ services:
     environment:
       PORT: "8080"
       NETDIAG_ASN_DB_DIR: /var/lib/netdiag
+      NETDIAG_ASN_RELOAD_INTERVAL: 5s
     volumes:
       - ./data:/var/lib/netdiag:ro
     restart: unless-stopped

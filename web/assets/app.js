@@ -46,7 +46,9 @@ async function checkIP() {
       (result.asnNetwork || "—") : "—");
     set("asn-domain", result.asnStatus === "completed" ?
       (result.asnDomain || "—") : "—");
-    set("asn-source", result.asnSource || "Not configured");
+    set("asn-source", result.asnSource ?
+      result.asnSource + (result.asnReloadStatus === "stale" ? " (stale)" : "") :
+      "Not configured");
     set("ip-state", "Completed");
   } catch {
     set("ip-state", "Unavailable");

@@ -20,7 +20,23 @@ To select one database explicitly, set `NETDIAG_ASN_DB_PATH` to its full file pa
 
 The selected database is logged during server startup. The `/api/ip` response and homepage also report the **actual provider** and MMDB database type when a database is active. No provider is claimed when none is available.
 
-NetDiag checks file metadata at most once per minute on lookups and safely replaces an open reader after a new MMDB has passed validation. Operators should **atomically replace files** rather than modify a memory-mapped MMDB in place. Newly added files and provider changes are detected without restarting when a lookup triggers a check.
+## Background hot reload
+
+The **running Go service watches the ASN directory every 5 seconds by default**, independently of browser visits or API calls. To change the scan interval, set `NETDIAG_ASN_RELOAD_INTERVAL` to a Go duration between `1s` and `1h` (for example `10s`). Invalid values fall back to `5s`. Each tick examines the configured candidates and reloads only when a file has changed or a higher-priority valid database becomes available.
+
+Database changes are applied without restarting the application:
+
+1. The updater writes a complete new MMDB to a **temporary file outside the recognized candidate names**.
+2. The updater atomically renames the completed file over the live `.mmdb` path.
+3. The watcher opens the new file, checks the ASN database type and verifies its integrity.
+4. On success, it switches readers under a mutex and closes the old reader only after switching. Concurrent ASN lookups are serialized with reload, preventing use-after-close.
+5. If all candidates are missing, invalid or corrupted **after a successful load**, the last validated snapshot remains active and the API reports `asnReloadStatus: "stale"`. The displayed ASN is still marked as coming from the retained database. A future valid update clears the stale state.
+
+The watcher stops and waits for shutdown before closing the MMDB reader. There is no external network lookup, database download or web-triggered reload endpoint. A live service can pick up newly added databases or a change in provider without restart.
+
+The existing lazy one-minute lookup check remains as a fallback for standalone `ipmeta.Store` consumers; the NetDiag HTTP service runs the background watcher in addition.
+
+**Warning:** Never overwrite, truncate, or edit an existing memory-mapped MMDB in place. Use atomic rename on the same filesystem; neither the watcher nor its mutex can protect another process modifying mapped bytes in place.
 
 ## Install an MMDB
 
@@ -78,6 +94,7 @@ Each database must be updated separately by the operator using the relevant vend
 | `asnDatabaseBuiltAt` | Database build timestamp if provided |
 | `asnSource` | `IPinfo` or `MaxMind GeoLite2 ASN`, empty when none is loaded |
 | `asnDatabaseType` | Detected internal MMDB database type |
+| `asnReloadStatus` | `completed` for current data, `stale` if using a last-known-good snapshot after a failed replacement, or an unavailable/unconfigured state |
 
 The IPinfo ASN value is stored as a string such as `AS13335`; NetDiag validates and converts it to a number before returning the API response. IPinfo Lite provides `as_name` and `as_domain` while IPinfo ASN provides `name` and `domain`. MaxMind's fields are `autonomous_system_number` and `autonomous_system_organization`.
 

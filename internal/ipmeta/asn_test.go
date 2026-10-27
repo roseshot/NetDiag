@@ -1,6 +1,8 @@
 package ipmeta
 
 import (
+	"context"
+	"time"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -134,5 +136,106 @@ func TestExplicitDatabaseOverridesAutoDirectory(t *testing.T) {
 	}
 	if got := s.Status().Status; got != "unavailable" {
 		t.Fatalf("missing explicit file: got %q, want unavailable", got)
+	}
+}
+
+func TestBackgroundHotReloadWithoutRequests(t *testing.T) {
+	dir := t.TempDir()
+	store := NewAuto("", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := store.Watch(ctx, 10*time.Millisecond)
+	defer func() {
+		cancel()
+		<-done
+		if err := store.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	state := func() string {
+		store.mu.Lock()
+		defer store.mu.Unlock()
+		return store.status
+	}
+	waitFor := func(expected string) {
+		t.Helper()
+		deadline := time.After(2 * time.Second)
+		for {
+			if got := state(); got == expected {
+				return
+			}
+			select {
+			case <-deadline:
+				t.Fatalf("background watcher did not reach %s; got %s", expected, state())
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+	}
+	filename := filepath.Join(dir, "ipinfo_asn.mmdb")
+	if err := os.WriteFile(filename, []byte("invalid MMDB"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	waitFor("unavailable")
+	if err := os.Remove(filename); err != nil {
+		t.Fatal(err)
+	}
+	waitFor("not_configured")
+}
+
+func TestWatchStopsOnContextCancellation(t *testing.T) {
+	store := NewAuto("", t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	done := store.Watch(ctx, 10*time.Millisecond)
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("watcher did not stop after context cancellation")
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Set NETDIAG_ASN_TEST_DB_PATH to run real MMDB hot-swap checks. No vendor
+// database or credentials are downloaded as part of the CI test suite.
+func TestOptionalHotSwapWithRealDatabase(t *testing.T) {
+	source := os.Getenv("NETDIAG_ASN_TEST_DB_PATH")
+	if source == "" {
+		t.Skip("No operator-supplied MMDB for hot-swap integration test")
+	}
+	original, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "GeoLite2-ASN.mmdb")
+	install := func(data []byte) {
+		t.Helper()
+		temp := path + ".tmp"
+		if err := os.WriteFile(temp, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(temp, path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	install(original)
+	store := NewAuto(path, "")
+	defer store.Close()
+	first := store.Lookup(netip.MustParseAddr("1.1.1.1"))
+	if first.Status != "completed" && first.Status != "not_found" {
+		t.Fatalf("valid database was not loaded: %+v", first)
+	}
+
+	install([]byte("corrupt replacement"))
+	if after := store.Refresh(); after.ReloadStatus != "stale" || after.Source != first.Source {
+		t.Fatalf("last verified database not retained after invalid replacement: %+v", after)
+	}
+	if usable := store.Lookup(netip.MustParseAddr("1.1.1.1")); usable.ReloadStatus != "stale" ||
+		(usable.Status != "completed" && usable.Status != "not_found") {
+		t.Fatalf("previously valid database should remain queryable: %+v", usable)
+	}
+	install(original)
+	if after := store.Refresh(); after.ReloadStatus != "completed" {
+		t.Fatalf("database did not recover after restored valid file: %+v", after)
 	}
 }

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"time"
 	"bytes"
 	"encoding/json"
 	"net/http"
@@ -184,5 +186,48 @@ func TestGeoLiteAttributionOnHomePage(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), "This product includes GeoLite Data created by MaxMind") {
 		t.Fatal("homepage missing MaxMind attribution")
+	}
+}
+
+func TestASNBackgroundWatcherCleanup(t *testing.T) {
+	t.Setenv("NETDIAG_ASN_DB_DIR", t.TempDir())
+	t.Setenv("NETDIAG_ASN_DB_PATH", "")
+	t.Setenv("NETDIAG_ASN_RELOAD_INTERVAL", "1s")
+	ctx, cancel := context.WithCancel(context.Background())
+	handler, cleanup := NewWithContext(ctx)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/health", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("server unavailable: got HTTP %d", res.Code)
+	}
+	cancel()
+	done := make(chan struct{})
+	go func() {
+		cleanup()
+		cleanup() // Cleanup must be idempotent.
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ASN watcher cleanup did not complete")
+	}
+}
+
+func TestASNReloadInterval(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		expected time.Duration
+	}{
+		{"", 5 * time.Second},
+		{"2s", 2 * time.Second},
+		{"100ms", 5 * time.Second},
+		{"bad", 5 * time.Second},
+		{"2h", 5 * time.Second},
+	} {
+		t.Setenv("NETDIAG_ASN_RELOAD_INTERVAL", tc.value)
+		if got := asnReloadInterval(); got != tc.expected {
+			t.Errorf("reload interval %q: got %s, want %s", tc.value, got, tc.expected)
+		}
 	}
 }
