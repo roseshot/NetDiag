@@ -14,9 +14,9 @@ import (
 
 const (
 	DatabaseType = "GeoLite2-ASN"
-	Source = "MaxMind GeoLite2 ASN"
+	Source       = "MaxMind GeoLite2 ASN"
 	SourceIPinfo = "IPinfo"
-	checkEvery = time.Minute
+	checkEvery   = time.Minute
 )
 
 var filenames = []string{
@@ -28,46 +28,48 @@ var filenames = []string{
 }
 
 type Record struct {
-	Number uint `maxminddb:"autonomous_system_number"`
+	Number       uint   `maxminddb:"autonomous_system_number"`
 	Organization string `maxminddb:"autonomous_system_organization"`
 }
 
 type ipinfoRecord struct {
-	ASN string `maxminddb:"asn"`
-	Name string `maxminddb:"name"`
-	Domain string `maxminddb:"domain"`
-	ASName string `maxminddb:"as_name"`
+	ASN      string `maxminddb:"asn"`
+	Name     string `maxminddb:"name"`
+	Domain   string `maxminddb:"domain"`
+	ASName   string `maxminddb:"as_name"`
 	ASDomain string `maxminddb:"as_domain"`
 }
 
 type Result struct {
-	Status string
-	ASN uint
+	Status       string
+	ASN          uint
 	Organization string
-	Domain string
-	Network string
+	Domain       string
+	Network      string
 	DatabaseTime string
-	Source string
+	Source       string
 	DatabaseType string
 }
 
 type Store struct {
-	mu sync.Mutex
-	paths []string
-	explicit bool
-	reader *maxminddb.Reader
-	file os.FileInfo
-	selected string
-	provider string
-	dbType string
+	mu        sync.Mutex
+	paths     []string
+	explicit  bool
+	reader    *maxminddb.Reader
+	file      os.FileInfo
+	selected  string
+	provider  string
+	dbType    string
 	buildTime string
-	status string
+	status    string
 	checkedAt time.Time
 }
 
 // New retains the explicit-path API; an empty path disables lookups.
 func New(path string) *Store {
-	if path == "" { return &Store{status: "not_configured"} }
+	if path == "" {
+		return &Store{status: "not_configured"}
+	}
 	return &Store{paths: []string{path}, explicit: true, status: "unavailable"}
 }
 
@@ -78,9 +80,13 @@ func NewAuto(explicitPath, directory string) *Store {
 	if explicitPath != "" {
 		s = New(explicitPath)
 	} else {
-		if directory == "" { directory = "./data" }
+		if directory == "" {
+			directory = "./data"
+		}
 		paths := make([]string, 0, len(filenames))
-		for _, name := range filenames { paths = append(paths, filepath.Join(directory, name)) }
+		for _, name := range filenames {
+			paths = append(paths, filepath.Join(directory, name))
+		}
 		s = &Store{paths: paths, status: "not_configured"}
 	}
 	s.Refresh()
@@ -110,7 +116,9 @@ func (s *Store) statusLocked() Result {
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.reader == nil { return nil }
+	if s.reader == nil {
+		return nil
+	}
 	err := s.reader.Close()
 	s.reader = nil
 	s.file = nil
@@ -122,7 +130,9 @@ func (s *Store) Close() error {
 
 // Only recognized ASN-capable MMDB metadata types are accepted.
 func providerFromMetadata(databaseType string) string {
-	if databaseType == DatabaseType { return Source }
+	if databaseType == DatabaseType {
+		return Source
+	}
 	t := strings.ToLower(databaseType)
 	if strings.HasPrefix(t, "ipinfo ") && (strings.Contains(t, "asn") || strings.Contains(t, "lite")) {
 		return SourceIPinfo
@@ -131,17 +141,25 @@ func providerFromMetadata(databaseType string) string {
 }
 
 func parseIPinfoASN(value string) (uint, bool) {
-	if len(value) < 3 || !strings.EqualFold(value[:2], "AS") { return 0, false }
+	if len(value) < 3 || !strings.EqualFold(value[:2], "AS") {
+		return 0, false
+	}
 	for _, ch := range value[2:] {
-		if ch < '0' || ch > '9' { return 0, false }
+		if ch < '0' || ch > '9' {
+			return 0, false
+		}
 	}
 	number, err := strconv.ParseUint(value[2:], 10, 32)
-	if err != nil || number == 0 { return 0, false }
+	if err != nil || number == 0 {
+		return 0, false
+	}
 	return uint(number), true
 }
 
 func (s *Store) detectLocked() {
-	if time.Since(s.checkedAt) < checkEvery { return }
+	if time.Since(s.checkedAt) < checkEvery {
+		return
+	}
 	s.checkedAt = time.Now()
 	if len(s.paths) == 0 {
 		s.dropLocked()
@@ -151,7 +169,9 @@ func (s *Store) detectLocked() {
 	seen := false
 	for _, path := range s.paths {
 		info, err := os.Stat(path)
-		if err != nil || info.IsDir() { continue }
+		if err != nil || info.IsDir() {
+			continue
+		}
 		seen = true
 		if s.reader != nil && s.file != nil && s.selected == path &&
 			os.SameFile(info, s.file) &&
@@ -161,7 +181,9 @@ func (s *Store) detectLocked() {
 			return
 		}
 		next, err := maxminddb.Open(path)
-		if err != nil { continue }
+		if err != nil {
+			continue
+		}
 		provider := providerFromMetadata(next.Metadata.DatabaseType)
 		if provider == "" {
 			_ = next.Close()
@@ -182,11 +204,17 @@ func (s *Store) detectLocked() {
 			s.buildTime = next.Metadata.BuildTime().UTC().Format(time.RFC3339)
 		}
 		s.status = "completed"
-		if old != nil { _ = old.Close() }
+		if old != nil {
+			_ = old.Close()
+		}
 		return
 	}
 	s.dropLocked()
-	if s.explicit || seen { s.status = "unavailable" } else { s.status = "not_configured" }
+	if s.explicit || seen {
+		s.status = "unavailable"
+	} else {
+		s.status = "not_configured"
+	}
 }
 
 func (s *Store) dropLocked() {
@@ -210,7 +238,9 @@ func (s *Store) Lookup(ip netip.Addr) Result {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.detectLocked()
-	if s.reader == nil { return Result{Status: s.status} }
+	if s.reader == nil {
+		return Result{Status: s.status}
+	}
 	details := s.statusLocked()
 	match := s.reader.Lookup(ip)
 	if s.provider == Source {
@@ -242,9 +272,13 @@ func (s *Store) Lookup(ip netip.Addr) Result {
 		}
 		details.ASN = number
 		details.Organization = record.ASName
-		if details.Organization == "" { details.Organization = record.Name }
+		if details.Organization == "" {
+			details.Organization = record.Name
+		}
 		details.Domain = record.ASDomain
-		if details.Domain == "" { details.Domain = record.Domain }
+		if details.Domain == "" {
+			details.Domain = record.Domain
+		}
 	}
 	if prefix := match.Prefix(); prefix.IsValid() {
 		details.Network = prefix.String()

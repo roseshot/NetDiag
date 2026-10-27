@@ -56,9 +56,9 @@ func TestOptionalRealDatabase(t *testing.T) {
 
 func TestIPinfoASNParsing(t *testing.T) {
 	for _, tc := range []struct {
-		value string
+		value  string
 		number uint
-		ok bool
+		ok     bool
 	}{
 		{"AS13335", 13335, true},
 		{"as64512", 64512, true},
@@ -78,7 +78,7 @@ func TestIPinfoASNParsing(t *testing.T) {
 
 func TestASNDatabaseTypeDetection(t *testing.T) {
 	for _, tc := range []struct {
-		kind string
+		kind     string
 		provider string
 	}{
 		{DatabaseType, Source},
