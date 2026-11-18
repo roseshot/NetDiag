@@ -39,7 +39,7 @@ Each independent probe makes four small browser requests per family when configu
 
 1. Publish an operator-specific Privacy Policy with contact details, purposes, applicable legal bases, data retention, third-party recipients, and rights information.
 2. Review privacy and communications rules that apply to the deployment. The scaffold uses no advertising or tracking cookies, but WebRTC/STUN can expose network data to third parties.
-3. Review acceptable-use and commercial terms for **every** public STUN server; remove unapproved endpoints. `ENABLE_PUBLIC_STUN` in `web/assets/app.js` can disable automatic third-party STUN checks.
+3. Review acceptable-use and commercial terms for **every** public STUN server; remove unapproved endpoints. `ENABLE_PUBLIC_STUN` in `web/assets/app.js` can disable the optional user-triggered third-party STUN check.
 4. Obtain licensed IPinfo or MaxMind ASN MMDB data, supply and update a local file, and retain required attribution. Never commit databases or updater credentials. See `docs/asn.md`.
 5. Set HTTP request quotas, per-IP and global concurrency limits, upstream bandwidth caps, quotas and cost alerts.
 6. Deploy HTTPS. Set strict trusted-proxy rules to identify the real visitor's address; never blindly accept `X-Forwarded-For`.

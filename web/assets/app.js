@@ -18,7 +18,8 @@ const STUN_PROVIDERS = [
 // Review STUN provider terms and privacy implications before public deployment.
 const ENABLE_PUBLIC_STUN = true;
 let currentTest = null;
-const stunController = new AbortController();
+let stunController = null;
+let stunRunning = false;
 let testConfig = { durationSeconds: 8, downloadRequestBytes: 4194304, uploadRequestBytes: 4194304 };
 
 async function getJSON(path, options = {}) {
@@ -107,19 +108,31 @@ function probeSTUN(url, signal) {
 }
 
 async function checkSTUN() {
+  if (stunRunning || currentTest) return;
   if (!ENABLE_PUBLIC_STUN) {
-    set("udp-state", "Disabled");
+    set("udp-state", "Not enabled");
+    $("stun-start").disabled = true;
     return;
   }
   if (typeof RTCPeerConnection !== "function") {
     set("udp-state", "WebRTC unavailable");
     return;
   }
+
+  const controller = new AbortController();
+  stunController = controller;
+  stunRunning = true;
+  $("stun-start").disabled = true;
+  $("stun-results").replaceChildren();
+  set("udp-endpoint", "—");
+  set("stun-count", "0 / " + STUN_PROVIDERS.length);
+  set("udp-state", "Checking");
+
   let next = 0;
   const results = new Array(STUN_PROVIDERS.length);
   const list = $("stun-results");
   const render = () => {
-    const success = results.filter((r) => r && r.state === "reachable").length;
+    const success = results.filter((entry) => entry && entry.state === "reachable").length;
     const done = results.filter(Boolean).length;
     set("stun-count", success + " / " + STUN_PROVIDERS.length);
     list.replaceChildren();
@@ -133,25 +146,56 @@ async function checkSTUN() {
       item.append(name, state);
       list.append(item);
     });
-    const mapped = results.find((r) => r && r.endpoint);
+    const mapped = results.find((entry) => entry && entry.endpoint);
     if (mapped) set("udp-endpoint", mapped.endpoint);
-    set("udp-state", stunController.signal.aborted ? "Paused for speed test" :
-      (done === STUN_PROVIDERS.length ? "Completed" : "Checking " + done + "/10"));
+    set("udp-state", controller.signal.aborted ? "Paused by speed test" :
+      (done === STUN_PROVIDERS.length ? "Completed" : "Checking " + done + "/" + STUN_PROVIDERS.length));
   };
   async function worker() {
-    while (!stunController.signal.aborted && next < STUN_PROVIDERS.length) {
+    while (!controller.signal.aborted && next < STUN_PROVIDERS.length) {
       const index = next++;
-      results[index] = await probeSTUN(STUN_PROVIDERS[index][1], stunController.signal);
+      results[index] = await probeSTUN(STUN_PROVIDERS[index][1], controller.signal);
       render();
     }
   }
-  await Promise.all([worker(), worker(), worker()]);
+  try {
+    await Promise.all([worker(), worker(), worker()]);
+  } finally {
+    if (controller.signal.aborted) set("udp-state", "Paused by speed test");
+    if (stunController === controller) stunController = null;
+    stunRunning = false;
+    $("stun-start").disabled = Boolean(currentTest);
+    $("stun-start").textContent = "Run UDP check again";
+  }
 }
 
 function checkCancel(signal) {
   if (signal.aborted) throw new DOMException("Test cancelled", "AbortError");
 }
 
+const TEST_PHASES = ["latency", "download", "upload"];
+function showTestPhase(phase) {
+  const activeIndex = TEST_PHASES.indexOf(phase);
+  for (const item of document.querySelectorAll("[data-test-phase]")) {
+    const index = TEST_PHASES.indexOf(item.dataset.testPhase);
+    item.dataset.state = activeIndex < 0 ? "complete" :
+      (index < activeIndex ? "complete" : index === activeIndex ? "active" : "pending");
+    if (index === activeIndex) item.setAttribute("aria-current", "step");
+    else item.removeAttribute("aria-current");
+  }
+}
+function updateTestProgress(phase, fraction) {
+  const value = Math.max(0, Math.min(1, fraction));
+  const ranges = { latency: [0, 20], download: [20, 60], upload: [60, 100] };
+  const range = ranges[phase];
+  if (range) $("test-progress").value = range[0] + value * (range[1] - range[0]);
+}
+function stopTestProgress() {
+  for (const item of document.querySelectorAll("[data-test-phase]")) {
+    if (item.dataset.state === "active") item.dataset.state = "stopped";
+    item.removeAttribute("aria-current");
+  }
+}
 let pingSequence = 0;
 
 async function pingSample(signal) {
@@ -179,6 +223,7 @@ async function measureLatency(signal) {
     checkCancel(signal);
     const ms = await pingSample(signal);
     if (i >= 2) samples.push(ms);
+    updateTestProgress("latency", (i + 1) / 12);
   }
   return NetDiagMetrics.summarizeLatency(samples);
 }
@@ -324,6 +369,7 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
     const deltaMs = now - lastTick;
     if (deltaMs > 0) {
       set("live-speed", NetDiagMetrics.throughputMbps(progressBytes - lastProgress, deltaMs).toFixed(2));
+      updateTestProgress(kind, (now - started) / (seconds * 1000));
     }
     lastProgress = progressBytes;
     lastTick = now;
@@ -377,6 +423,7 @@ async function timedTransfer(kind, streams, seconds, parentSignal) {
   }
 
   checkCancel(parentSignal);
+  updateTestProgress(kind, 1);
   const tcp = await readTCPWindow(windowToken, parentSignal);
   if (fatalError) throw fatalError;
   if (confirmedBytes <= 0 || (kind === "upload" && completedRequests === 0)) {
@@ -402,43 +449,79 @@ function showLoadedLatency(kind, idle, loaded) {
 
 async function startTest() {
   if (currentTest) return;
-  stunController.abort(); // Stop third-party probes before throughput or loaded-latency tests.
+  stunController?.abort(); // Suspend external STUN probing before the bandwidth test.
   const controller = new AbortController();
   currentTest = controller;
   $("start").disabled = true;
   $("stop").disabled = false;
+  $("streams").disabled = true;
+  $("stun-start").disabled = true;
+  $("test-status").classList.remove("muted");
+  set("test-status", "Running");
+  set("result-summary", "Testing your connection. Results will appear as each stage finishes.");
+  $("test-progress").value = 0;
   for (const id of ["ping", "jitter", "download", "upload", "download-loaded",
     "upload-loaded", "download-p95", "upload-p95",
     "tcp-download-delta", "tcp-upload-delta"]) set(id, "—");
-  set("live-speed", "0.00");
+  set("live-speed", "—");
+  set("speed-label", "Live speed");
   const streams = Number($("streams").value);
+  let completed = false;
   try {
-    set("phase", "Measuring idle HTTP latency...");
+    showTestPhase("latency");
+    set("phase", "1 of 3 · Measuring idle HTTP latency...");
     const idle = await measureLatency(controller.signal);
     set("ping", fmt(idle.medianMs));
     set("jitter", fmt(idle.jitterMs));
 
-    set("phase", "Measuring download and loaded latency with " + streams + " stream(s)...");
+    showTestPhase("download");
+    set("phase", "2 of 3 · Measuring download speed and loaded latency...");
     const download = await timedTransfer("download", streams, testConfig.durationSeconds, controller.signal);
     set("download", fmt(download.mbps));
     showLoadedLatency("download", idle, download.latency);
     showTCPWindow("download", download.tcp);
 
-    set("phase", "Measuring upload and loaded latency with " + streams + " stream(s)...");
+    showTestPhase("upload");
+    set("phase", "3 of 3 · Measuring upload speed and loaded latency...");
     const upload = await timedTransfer("upload", streams, testConfig.durationSeconds, controller.signal);
     set("upload", fmt(upload.mbps));
     showLoadedLatency("upload", idle, upload.latency);
     showTCPWindow("upload", upload.tcp);
 
-    set("phase", "Test completed · upload counts only server-confirmed requests");
-    set("live-speed", fmt(upload.mbps));
+    showTestPhase(null);
+    $("test-progress").value = 100;
+    set("speed-label", "Download speed");
+    set("live-speed", fmt(download.mbps));
+    set("test-status", "Complete");
+    set("phase", "Test completed · Upload rate includes only server-confirmed requests.");
+    set("result-summary", NetDiagUX.describe({
+      downloadMbps: download.mbps,
+      uploadMbps: upload.mbps,
+      latencyMs: idle.medianMs,
+      downloadAddedMs: NetDiagMetrics.addedLatency(idle.medianMs, download.latency.medianMs),
+      uploadAddedMs: NetDiagMetrics.addedLatency(idle.medianMs, upload.latency.medianMs),
+      streams
+    }));
+    completed = true;
   } catch (error) {
-    set("phase", error.name === "AbortError" ? "Test cancelled" : "Test failed: " + error.message);
-    set("live-speed", "0.00");
+    stopTestProgress();
+    const cancelled = error.name === "AbortError";
+    set("test-status", cancelled ? "Stopped" : "Incomplete");
+    set("phase", cancelled ? "Test stopped. Partial measurements are not a full result." :
+      "Test failed: " + error.message);
+    set("speed-label", "Speed test");
+    set("live-speed", "—");
+    set("result-summary", cancelled ?
+      "You stopped the test before all stages completed. Run it again for comparable results." :
+      "The test could not finish. Check your connection and run it again. Any values shown are partial.");
   } finally {
+    if (!completed) $("test-status").classList.add("muted");
     currentTest = null;
     $("start").disabled = false;
+    $("start").textContent = "Run test again";
     $("stop").disabled = true;
+    $("streams").disabled = false;
+    if (!stunRunning) $("stun-start").disabled = false;
   }
 }
 
@@ -449,7 +532,7 @@ $("stop").addEventListener("click", () => currentTest?.abort());
 // The Go endpoint returns HTTP 409 if the request arrives on the wrong family.
 async function probeAddressFamily(family, origin) {
   if (!origin) {
-    set(family + "-state", "Not configured");
+    set(family + "-state", "Not enabled");
     return;
   }
   const requested = family === "ipv4" ? "4" : "6";
@@ -498,7 +581,7 @@ getJSON("/api/config").then((config) => {
   testConfig = { ...testConfig, ...config };
   dnsEnabled = config.dnsResolvers === "available";
   $("dns-start").disabled = !dnsEnabled;
-  set("dns-state", dnsEnabled ? "Ready" : "Not configured");
+  set("dns-state", dnsEnabled ? "Ready" : "Not enabled");
   if (dnsEnabled) set("dns-message", "Click Check DNS to request an opt-in resolver observation.");
   const origins = config.probeOrigins || {};
   void Promise.all([
@@ -573,7 +656,7 @@ $("dns-start").addEventListener("click", () => { void checkDNS(); });
 
 void checkIP();
 void checkTCP();
-void checkSTUN();
+$("stun-start").addEventListener("click", () => { void checkSTUN(); });
 
 // Reflect MMDB hot reload on an already-open page without reloading it.
 setInterval(() => {

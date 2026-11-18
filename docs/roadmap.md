@@ -13,7 +13,8 @@ This document distinguishes delivered scaffold behavior from future work.
 - Configurable IPv4/IPv6 independent probe origins, address-family verification, limited cross-origin access and browser HTTP RTT checks.
 - Optional direct Go HTTPS listener using externally managed certificates.
 - Opt-in authoritative DNS observer, expiring one-time challenges, resolver peer IPs, local ASN enrichment and a built-in cache-disabled HTTPS challenge pixel handler.
-- Configurable public WebRTC STUN probes with disabled-WebRTC fallback.
+- Explicitly activated, configurable public WebRTC STUN probes with disabled-WebRTC fallback and automatic pause during speed tests.
+- Task-focused speed-test UI with progress, user-facing interpretation, and expandable advanced diagnostics.
 - Per-peer request concurrency caps in addition to the global transfer limit.
 - Browser measurement math tests and Go HTTP tests.
 - Build/test workflow and Docker packaging.
@@ -26,9 +27,8 @@ This document distinguishes delivered scaffold behavior from future work.
 4. Production ASN database freshness alerting and independent BGP prefix verification (GeoLite matching ranges are not announced BGP prefixes).
 5. Production DNS delegation and wildcard TLS routing validation, resolver-forwarding accuracy studies and browser interoperability testing.
 6. More granular WebRTC diagnostics, retaining `Undetermined` when NAT behavior cannot be established.
-7. Optional explicit-activation controls for third-party probes.
-8. Hardened rate limiting, observability and bounded traffic/cost policies.
-9. Final operator-specific Privacy Policy and deployment privacy review.
-10. Browser QA, integration testing and reproducible accuracy benchmarking.
+7. Hardened rate limiting, observability and bounded traffic/cost policies.
+8. Final operator-specific Privacy Policy and deployment privacy review.
+9. Browser QA, integration testing and reproducible accuracy benchmarking.
 
 No roadmap item is represented as a completed feature in the UI or API.

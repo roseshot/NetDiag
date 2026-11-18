@@ -15,8 +15,8 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Optional independent IPv4/IPv6 connectivity probes with separate observed addresses and HTTP RTT samples.
 - Exact-origin CORS allowlisting and a CSP that permits only configured first-party probe origins.
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
-- Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
-- A homepage that hides unavailable ASN metadata, offers an accessible source tooltip next to available ASNs, and offers opt-in DNS resolver discovery when configured.
+- An explicit, optional UDP/STUN check using up to ten public WebRTC STUN endpoints, with graceful degradation when WebRTC is unavailable.
+- A task-focused homepage with staged speed-test progress, result interpretation, expandable advanced diagnostics, accessible ASN source attribution, and opt-in DNS / UDP checks.
 - Docker image, Docker Compose, tests, and GitHub Actions CI on pushes and pull requests.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
@@ -38,7 +38,7 @@ NetDiag startup features:
   [not configured   ] Independent IPv4 probe: dedicated origin not set
   [not configured   ] Independent IPv6 probe: dedicated origin not set
   [not configured   ] DNS resolver discovery: authoritative observer disabled
-  [browser-dependent] STUN/NAT discovery: WebRTC probes use third-party STUN servers; server cannot verify browser support
+  [browser-dependent] Opt-in STUN/NAT discovery: WebRTC uses third-party STUN servers only when requested
 ```
 
 With an MMDB loaded, the summary includes the selected IPinfo/MaxMind provider and MMDB type. With a configured DNS observer, it displays the observation zone. Independent IPv4/IPv6 origins are reported as **configured, not confirmed reachable**; connectivity still depends on DNS, TLS, and routing. The HTTP/HTTPS listener is logged separately. ASN database updates are logged after startup by the existing hot-reload watcher.
@@ -132,8 +132,8 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - `/api/ip` reports the directly connected HTTP peer. Do not trust arbitrary `X-Forwarded-For` headers; configure a trusted-proxy policy before enabling client IP reporting behind a reverse proxy.
 - ASN lookup requires an operator-provided, independently updated IPinfo or MaxMind MMDB file. DNS resolver discovery includes an authoritative DNS observer and an HTTPS pixel endpoint, but requires public DNS delegation, UDP/TCP 53 reachability, wildcard TLS configuration and hostname routing.
 - STUN only measures ICE server-reflexive candidates and does **not** reliably determine a NAT's cone/symmetric classification. Browser restrictions and blocked UDP cause inconclusive results.
-- Automatic STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
-- Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.
+- User-initiated STUN probes are stopped when a bandwidth test starts to reduce interference. The public STUN server list is an **unverified integration candidate list**, not a promise of uptime, commercial-use permission, or provider support. Confirm each provider's terms before commercial deployment.
+- Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes contact external services only when a visitor clicks **Run UDP check**.
 - This scaffold is not production hardened. Add per-IP quotas, trusted-proxy configuration, measurement-session accounting, monitoring, traffic budgets, real TLS termination, and legal review before a public launch.
 
 ## Dependency updates and automatic merging

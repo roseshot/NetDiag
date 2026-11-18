@@ -3,129 +3,175 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Ad-free internet speed test and network diagnostics.">
+  <meta name="description" content="Private, ad-free HTTP speed testing and optional advanced network diagnostics.">
   <meta name="color-scheme" content="dark">
   <title>NetDiag — Internet Speed Test &amp; Diagnostics</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/metrics.js" defer></script>
   <script src="/asn-ui.js" defer></script>
+  <script src="/ux.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <div class="container">
     <header class="site-header">
-      <a class="brand" href="/" aria-label="NetDiag home"><span class="brand-mark">N</span> NetDiag</a>
-      <span class="badge">Ad-free · Privacy-focused</span>
+      <a class="brand" href="/" aria-label="NetDiag home"><span class="brand-mark" aria-hidden="true">N</span> NetDiag</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="#diagnostics">Advanced diagnostics</a>
+        <a href="/privacy.html">Privacy</a>
+      </nav>
     </header>
 
     <main>
       <section class="hero" aria-labelledby="speed-heading">
-        <div class="eyebrow">NETWORK PERFORMANCE</div>
-        <h1 id="speed-heading">Internet Speed Test</h1>
-        <p class="lead">Measure your connection. Understand what is happening on your network.</p>
-
-        <div class="speed-display"><span id="live-speed">0.00</span><span class="unit">Mbps</span></div>
-        <div id="phase" class="phase" role="status" aria-live="polite">Ready to test</div>
-
-        <div class="controls">
-          <label for="streams">Test mode</label>
-          <select id="streams" aria-label="Concurrent data streams">
-            <option value="1">Single stream</option>
-            <option value="4" selected>4 streams</option>
-            <option value="8">8 streams</option>
-            <option value="16">16 streams</option>
-          </select>
-          <button id="start" class="primary">Start test</button>
-          <button id="stop" class="secondary" disabled>Stop</button>
+        <div class="hero-intro">
+          <div class="eyebrow">PRIVATE NETWORK MEASUREMENTS</div>
+          <h1 id="speed-heading">Understand your connection.</h1>
+          <p class="lead">Measure download and upload speed, latency, and how responsive your connection stays under load. No account or tracking cookies required.</p>
         </div>
 
-        <div class="results">
-          <div><span class="result-label">Latency</span><strong id="ping">—</strong><small>ms</small></div>
-          <div><span class="result-label">Jitter</span><strong id="jitter">—</strong><small>ms</small></div>
-          <div><span class="result-label">Download</span><strong id="download">—</strong><small>Mbps</small></div>
-          <div><span class="result-label">Upload</span><strong id="upload">—</strong><small>Mbps · confirmed</small></div>
-          <div><span class="result-label">Download added latency</span><strong id="download-loaded">—</strong><small>ms · P50</small></div>
-          <div><span class="result-label">Upload added latency</span><strong id="upload-loaded">—</strong><small>ms · P50</small></div>
-        </div>
-        <p class="hint">HTTP RTT under load · Download P95: <strong id="download-p95">—</strong> ms · Upload P95: <strong id="upload-p95">—</strong> ms. Upload excludes incomplete requests.</p>
-      </section>
+        <div class="test-console" aria-label="Speed test">
+          <div class="live-heading">
+            <span id="speed-label">Speed test</span>
+            <span id="test-status" class="state muted">Not tested</span>
+          </div>
+          <div class="speed-display"><span id="live-speed">—</span><span class="unit">Mbps</span></div>
+          <div id="phase" class="phase" role="status" aria-live="polite" aria-atomic="true">Ready when you are. The test sends and receives temporary data.</div>
 
-      <section class="section-heading">
-        <div><div class="eyebrow">AUTOMATIC CHECKS</div><h2>Network Diagnostics</h2></div>
-        <p>Lightweight checks run when this page opens. The bandwidth test runs only after you click Start.</p>
-      </section>
+          <ol class="test-steps" aria-label="Speed test stages">
+            <li data-test-phase="latency" data-state="pending"><span class="step-number">1</span> Latency</li>
+            <li data-test-phase="download" data-state="pending"><span class="step-number">2</span> Download</li>
+            <li data-test-phase="upload" data-state="pending"><span class="step-number">3</span> Upload</li>
+          </ol>
+          <progress id="test-progress" max="100" value="0" aria-label="Speed test progress"></progress>
 
-      <div class="grid">
-        <section class="card" aria-labelledby="ip-heading">
-          <div class="card-head"><h3 id="ip-heading">IP information</h3><span id="ip-state" class="state">Checking</span></div>
-          <dl><div><dt>Observed IP</dt><dd id="public-ip">—</dd></div>
-            <div><dt>Address family</dt><dd id="ip-family">—</dd></div>
-            <div class="asn-detail" hidden>
-              <dt>ASN <span class="asn-help">
-                <button class="asn-info-button" type="button" id="asn-info-button" aria-label="ASN data source" aria-describedby="asn-source-tooltip">i</button>
-                <span class="asn-info-tooltip" id="asn-source-tooltip" role="tooltip"></span>
-              </span></dt>
-              <dd id="asn">—</dd>
+          <div class="controls">
+            <button id="start" class="primary" type="button">Start speed test</button>
+            <button id="stop" class="secondary" type="button" disabled>Stop test</button>
+          </div>
+
+          <details class="test-options">
+            <summary>Test settings <span>4 concurrent requests by default</span></summary>
+            <div class="option-row">
+              <label for="streams">Concurrent requests</label>
+              <select id="streams">
+                <option value="1">1 — Single stream</option>
+                <option value="4" selected>4 — Standard</option>
+                <option value="8">8 — High concurrency</option>
+                <option value="16">16 — High concurrency</option>
+              </select>
             </div>
-            <div class="asn-detail" hidden><dt>AS organization</dt><dd id="asn-organization">—</dd></div>
-            <div class="asn-detail" hidden><dt>AS domain</dt><dd id="asn-domain">—</dd></div>
-            <div class="asn-detail" hidden><dt>ASN database range</dt><dd id="asn-network">—</dd></div></dl>
-          <p class="hint">The IP address describes the direct server peer, which may be a reverse proxy.</p>
-          <p id="asn-note" class="hint" hidden>The ASN database range is not necessarily an announced BGP prefix.</p>
-        </section>
-
-        <section class="card" aria-labelledby="families-heading">
-          <div class="card-head"><h3 id="families-heading">IPv4 / IPv6 connectivity</h3><span class="state muted">Independent probes</span></div>
-          <dl>
-            <div><dt>IPv4 address</dt><dd id="ipv4-address">—</dd></div>
-            <div><dt>IPv4 HTTP RTT</dt><dd id="ipv4-rtt">—</dd></div>
-            <div><dt>IPv4 status</dt><dd id="ipv4-state">Not configured</dd></div>
-            <div><dt>IPv6 address</dt><dd id="ipv6-address">—</dd></div>
-            <div><dt>IPv6 HTTP RTT</dt><dd id="ipv6-rtt">—</dd></div>
-            <div><dt>IPv6 status</dt><dd id="ipv6-state">Not configured</dd></div>
-          </dl>
-          <p class="hint">Independent checks require separately configured IPv4-only and IPv6-only endpoints. Values describe the direct server peer, not a forwarded address.</p>
-        </section>
-
-        <section class="card" aria-labelledby="tcp-heading">
-          <div class="card-head"><h3 id="tcp-heading">TCP diagnostics</h3><span id="tcp-state" class="state">Checking</span></div>
-          <dl><div><dt>Server TCP RTT</dt><dd id="tcp-rtt">—</dd></div>
-            <div><dt>Total retransmissions</dt><dd id="tcp-retrans">—</dd></div>
-            <div><dt>Download retransmission delta</dt><dd id="tcp-download-delta">—</dd></div>
-            <div><dt>Upload retransmission delta</dt><dd id="tcp-upload-delta">—</dd></div>
-            <div><dt>Send MSS</dt><dd id="tcp-mss">—</dd></div></dl>
-          <details><summary>Connection details</summary>
-            <dl><div><dt>Receive MSS</dt><dd id="tcp-receive-mss">—</dd></div>
-              <div><dt>Path MTU</dt><dd id="tcp-pmtu">—</dd></div>
-              <div><dt>RTT variance</dt><dd id="tcp-rttvar">—</dd></div></dl>
+            <p class="hint">More concurrent requests can better utilize fast connections, but they are not necessarily separate TCP connections. Changing this setting takes effect on your next test.</p>
           </details>
-          <p class="hint">Server-side TCP_INFO on Linux. Delta measurements are taken from TCP sockets serving tagged speed-test transfers; shared HTTP/2 connections may include unrelated traffic, and results may be unavailable. Behind a TLS reverse proxy, these values describe proxy-to-Go traffic, not the browser-to-edge connection.</p>
-        </section>
+        </div>
 
-        <section class="card" aria-labelledby="dns-heading">
-          <div class="card-head"><h3 id="dns-heading">DNS resolver discovery</h3><span id="dns-state" class="state muted">Not configured</span></div>
-          <p class="empty">Find the recursive resolvers that contact NetDiag's authoritative DNS observer.</p>
-          <button id="dns-start" class="secondary" type="button" disabled>Check DNS</button>
-          <ul id="dns-results" class="dns-results" aria-live="polite"></ul>
-          <p id="dns-message" class="hint">Configure a dedicated DNS observation zone to enable this test.</p>
-          <p class="hint">Opt-in only. The observed servers may be DNS forwarders or shared resolvers, not necessarily the DNS servers configured on your device.</p>
+        <section class="result-section" aria-labelledby="results-heading">
+          <div class="result-heading"><h2 id="results-heading">Your results</h2><span class="result-subtitle">HTTP measurements to this server</span></div>
+          <div class="results">
+            <div class="result-tile"><span class="result-label">Download</span><div class="result-value"><strong id="download">—</strong><small>Mbps</small></div><p>Data received</p></div>
+            <div class="result-tile"><span class="result-label">Upload</span><div class="result-value"><strong id="upload">—</strong><small>Mbps</small></div><p>Server-confirmed data</p></div>
+            <div class="result-tile"><span class="result-label">Idle latency</span><div class="result-value"><strong id="ping">—</strong><small>ms</small></div><p>Lower is generally better</p></div>
+          </div>
+          <p id="result-summary" class="result-summary" role="status" aria-live="polite">Start a test to see measured results and a short explanation.</p>
+          <details class="technical-results">
+            <summary>Detailed latency measurements</summary>
+            <div class="technical-grid">
+              <div><span class="result-label">Jitter</span><strong id="jitter">—</strong><small>ms</small></div>
+              <div><span class="result-label">Download added latency</span><strong id="download-loaded">—</strong><small>ms · P50</small></div>
+              <div><span class="result-label">Upload added latency</span><strong id="upload-loaded">—</strong><small>ms · P50</small></div>
+              <div><span class="result-label">Download latency P95</span><strong id="download-p95">—</strong><small>ms</small></div>
+              <div><span class="result-label">Upload latency P95</span><strong id="upload-p95">—</strong><small>ms</small></div>
+            </div>
+            <p class="hint">Latency uses HTTP round trips, not ICMP ping. Added latency compares median response time under load against idle latency. Incomplete upload requests are excluded from final throughput.</p>
+          </details>
         </section>
+        <p class="method-note">This measures performance between your browser and this NetDiag server. Results may differ from your provider's advertised speed and other test locations.</p>
+      </section>
 
-        <section class="card" aria-labelledby="udp-heading">
-          <div class="card-head"><h3 id="udp-heading">UDP / STUN</h3><span id="udp-state" class="state">Checking</span></div>
-          <dl><div><dt>STUN servers</dt><dd id="stun-count">0 / 10</dd></div>
-            <div><dt>UDP NAT type</dt><dd>Undetermined</dd></div>
-            <div><dt>Mapped endpoint</dt><dd id="udp-endpoint">—</dd></div></dl>
-          <details><summary>STUN server results</summary><ul id="stun-results" class="stun-list"></ul></details>
-          <p class="hint">Public STUN probes contact external providers. WebRTC may be disabled or restricted. STUN results cannot reliably classify cone/symmetric NAT.</p>
-        </section>
-      </div>
+      <section class="diagnostics" id="diagnostics" aria-labelledby="diagnostics-heading">
+        <div class="section-heading">
+          <div><div class="eyebrow">OPTIONAL DEEP DIVE</div><h2 id="diagnostics-heading">Network diagnostics</h2></div>
+          <p>Basic network information is checked when this page opens. DNS and third-party UDP checks only run when requested.</p>
+        </div>
+
+        <details class="diagnostics-panel" id="advanced-diagnostics">
+          <summary><span><strong>Explore advanced diagnostics</strong><small>IP address, IPv4 / IPv6, TCP, DNS and UDP / STUN</small></span><span class="expand-label">Show details</span></summary>
+          <div class="grid">
+            <section class="card" aria-labelledby="ip-heading">
+              <div class="card-head"><h3 id="ip-heading">IP information</h3><span id="ip-state" class="state muted">Checking</span></div>
+              <dl><div><dt>Observed IP</dt><dd id="public-ip">—</dd></div>
+                <div><dt>Address family</dt><dd id="ip-family">—</dd></div>
+                <div class="asn-detail" hidden>
+                  <dt>ASN <span class="asn-help">
+                    <button class="asn-info-button" type="button" id="asn-info-button" aria-label="ASN data source" aria-describedby="asn-source-tooltip">i</button>
+                    <span class="asn-info-tooltip" id="asn-source-tooltip" role="tooltip"></span>
+                  </span></dt>
+                  <dd id="asn">—</dd>
+                </div>
+                <div class="asn-detail" hidden><dt>AS organization</dt><dd id="asn-organization">—</dd></div>
+                <div class="asn-detail" hidden><dt>AS domain</dt><dd id="asn-domain">—</dd></div>
+                <div class="asn-detail" hidden><dt>ASN database range</dt><dd id="asn-network">—</dd></div></dl>
+              <p class="hint">This is the direct server peer, which may be a reverse proxy.</p>
+              <p id="asn-note" class="hint" hidden>The ASN database range is not necessarily an announced BGP prefix.</p>
+            </section>
+
+            <section class="card" aria-labelledby="families-heading">
+              <div class="card-head"><h3 id="families-heading">IPv4 / IPv6 connectivity</h3><span class="state muted">Independent probes</span></div>
+              <dl>
+                <div><dt>IPv4 address</dt><dd id="ipv4-address">—</dd></div>
+                <div><dt>IPv4 HTTP RTT</dt><dd id="ipv4-rtt">—</dd></div>
+                <div><dt>IPv4 status</dt><dd id="ipv4-state">Not enabled</dd></div>
+                <div><dt>IPv6 address</dt><dd id="ipv6-address">—</dd></div>
+                <div><dt>IPv6 HTTP RTT</dt><dd id="ipv6-rtt">—</dd></div>
+                <div><dt>IPv6 status</dt><dd id="ipv6-state">Not enabled</dd></div>
+              </dl>
+              <p class="hint">Separate IPv4-only and IPv6-only endpoints must be enabled by the site operator. Unavailable does not necessarily mean your device lacks IPv6.</p>
+            </section>
+
+            <section class="card" aria-labelledby="tcp-heading">
+              <div class="card-head"><h3 id="tcp-heading">TCP diagnostics</h3><span id="tcp-state" class="state muted">Checking</span></div>
+              <dl><div><dt>Server TCP RTT</dt><dd id="tcp-rtt">—</dd></div>
+                <div><dt>Total retransmissions</dt><dd id="tcp-retrans">—</dd></div>
+                <div><dt>Download retransmission delta</dt><dd id="tcp-download-delta">—</dd></div>
+                <div><dt>Upload retransmission delta</dt><dd id="tcp-upload-delta">—</dd></div>
+                <div><dt>Send MSS</dt><dd id="tcp-mss">—</dd></div></dl>
+              <details><summary>Connection details</summary>
+                <dl><div><dt>Receive MSS</dt><dd id="tcp-receive-mss">—</dd></div>
+                  <div><dt>Path MTU</dt><dd id="tcp-pmtu">—</dd></div>
+                  <div><dt>RTT variance</dt><dd id="tcp-rttvar">—</dd></div></dl>
+              </details>
+              <p class="hint">Linux server-side TCP_INFO; a reverse proxy changes which connection is measured. Retransmission deltas are socket observations, not packet-loss percentages.</p>
+            </section>
+
+            <section class="card" aria-labelledby="dns-heading">
+              <div class="card-head"><h3 id="dns-heading">DNS resolver discovery</h3><span id="dns-state" class="state muted">Not enabled</span></div>
+              <p class="empty">Observe which recursive DNS servers contact this site's authoritative DNS observer.</p>
+              <button id="dns-start" class="secondary" type="button" disabled>Check DNS</button>
+              <ul id="dns-results" class="dns-results" aria-live="polite"></ul>
+              <p id="dns-message" class="hint">The operator has not enabled the DNS observation service.</p>
+              <p class="hint">Opt-in only. Observed addresses can be shared forwarders, not the resolvers configured directly on your device.</p>
+            </section>
+
+            <section class="card" aria-labelledby="udp-heading">
+              <div class="card-head"><h3 id="udp-heading">UDP / STUN</h3><span id="udp-state" class="state muted">Not started</span></div>
+              <p class="empty">Check whether public STUN services can observe a mapped UDP address from your browser.</p>
+              <button id="stun-start" class="secondary" type="button">Run UDP check</button>
+              <p class="hint privacy-warning">This optional check contacts up to 10 external STUN endpoints. Those providers may see your public IP address and UDP port. <a href="/privacy.html">How this works</a>.</p>
+              <dl><div><dt>Reachable STUN servers</dt><dd id="stun-count">—</dd></div>
+                <div><dt>UDP NAT type</dt><dd>Undetermined</dd></div>
+                <div><dt>Mapped endpoint</dt><dd id="udp-endpoint">—</dd></div></dl>
+              <details><summary>STUN server results</summary><ul id="stun-results" class="stun-list"></ul></details>
+              <p class="hint">Browser and network restrictions can make results inconclusive; STUN cannot reliably classify the NAT type.</p>
+            </section>
+          </div>
+        </details>
+      </section>
     </main>
 
     <footer>
-      <p>NetDiag is an ad-free network measurement project. No analytics or tracking cookies are included in this scaffold.</p>
-      <p>This product includes GeoLite Data created by MaxMind, available from <a href="https://www.maxmind.com" rel="noopener noreferrer">MaxMind</a>. IP address data powered by <a href="https://ipinfo.io" rel="noopener noreferrer">IPinfo</a> when selected.</p>
-      <p>Third-party STUN endpoints can observe your public IP. <a href="/privacy.html">Privacy Policy</a> · <a href="https://github.com/roseshot/NetDiag" rel="noopener noreferrer">Source code</a></p>
+      <p>Ad-free network measurements. No accounts, analytics or tracking cookies in the default software.</p>
+      <p>Some optional checks contact external services. <a href="/privacy.html">Privacy Policy</a> · <a href="https://github.com/roseshot/NetDiag" rel="noopener noreferrer">Source code</a></p>
+      <p>ASN databases: <a href="https://www.maxmind.com" rel="noopener noreferrer">MaxMind GeoLite</a> and <a href="https://ipinfo.io" rel="noopener noreferrer">IPinfo</a>, when configured.</p>
     </footer>
   </div>
 </body>
