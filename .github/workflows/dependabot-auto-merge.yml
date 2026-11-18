@@ -1,0 +1,57 @@
+name: Dependabot auto-merge
+
+# Run after read-only PR CI has finished. Merge every Dependabot update that
+# passed the full CI workflow, regardless of ecosystem or version.
+on:
+  workflow_run:
+    workflows: [Go CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge successful Dependabot updates
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge Dependabot PR at the tested head SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_PRS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          set -euo pipefail
+
+          prs=$(jq -r '.[].number' <<< "$EVENT_PRS")
+          # GitHub can omit PR associations from workflow_run events.
+          if [[ -z "$prs" ]]; then
+            prs=$(gh api "repos/$REPOSITORY/commits/$TESTED_SHA/pulls" --jq '.[].number')
+          fi
+
+          while IFS= read -r number; do
+            [[ -n "$number" ]] || continue
+            pr=$(gh api "repos/$REPOSITORY/pulls/$number")
+            if ! jq -e --arg repo "$REPOSITORY" --arg sha "$TESTED_SHA" '
+              .user.login == "dependabot[bot]" and
+              .state == "open" and
+              .base.ref == "main" and
+              .head.repo.full_name == $repo and
+              .head.sha == $sha
+            ' <<< "$pr" >/dev/null; then
+              continue
+            fi
+
+            gh api --method PUT "repos/$REPOSITORY/pulls/$number/merge" \
+              -f sha="$TESTED_SHA" -f merge_method=squash
+          done <<< "$prs"
