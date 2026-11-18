@@ -17,7 +17,7 @@ NetDiag is a privacy-focused Go web application with a lightweight browser UI. T
 - Optional direct TLS termination in Go for accurate direct-peer measurements.
 - Ten **public STUN endpoints** probed with WebRTC, with graceful degradation when WebRTC is unavailable.
 - A homepage that hides unavailable ASN metadata, offers an accessible source tooltip next to available ASNs, and offers opt-in DNS resolver discovery when configured.
-- Docker image, Docker Compose, tests, and push-to-main GitHub Actions CI.
+- Docker image, Docker Compose, tests, and GitHub Actions CI on pushes and pull requests.
 - No advertising, analytics trackers, user accounts, or application cookies in this scaffold.
 
 ## Startup feature summary
@@ -136,6 +136,14 @@ A reverse proxy that terminates the client connection **changes the meaning of t
 - Disable or replace third-party STUN probes if they do not meet your privacy and contractual requirements. These probes automatically contact external services on page load.
 - This scaffold is not production hardened. Add per-IP quotas, trusted-proxy configuration, measurement-session accounting, monitoring, traffic budgets, real TLS termination, and legal review before a public launch.
 
+## Dependency updates and automatic merging
+
+[Dependabot](.github/dependabot.yml) checks Go modules, Docker base images and GitHub Actions each Thursday at 01:00 UTC. There are no version exclusions: major, minor, patch, prerelease and security updates are all eligible.
+
+Dependabot pull requests targeting `main` run the complete [Go CI](.github/workflows/ci.yml) workflow, including Go module verification, formatting, vet, race tests, Docker build, JavaScript syntax and browser tests. When that **entire CI run succeeds**, the [auto-merge workflow](.github/workflows/dependabot-auto-merge.yml) confirms the author is `dependabot[bot]` and the tested commit is still the PR's current head, then attempts a squash merge. There is no manual opt-in or dependency-version filter. A failed or cancelled CI run, an untested newer commit, merge conflict, or GitHub-enforced rules can prevent merging.
+
+The auto-merge job uses a separate trusted `workflow_run` event and does not check out PR code with write permissions.
+
 ## Project structure
 
 ```text
@@ -144,7 +152,7 @@ internal/server/          API handlers, limits and tests
 internal/diagnostics/     Linux TCP_INFO implementation
 web/                      Embedded HTML, CSS and JavaScript
 docs/                     Architecture, deployment and roadmap
-.github/workflows/        Go CI (push to main)
+.github/workflows/        Go CI (push and PR), Dependabot auto-merge
 Dockerfile                Multi-stage container build
 compose.yaml              Local container development
 ```
